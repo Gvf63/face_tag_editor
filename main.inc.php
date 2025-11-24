@@ -1,24 +1,33 @@
 <?php
 /*
 Plugin Name: face_tag_write
-Version: 1.0
-Description: Créer et enregistrer les tags de visages dans les métadonnées XMP
+Version: 1.1
+Description: Créer et enregistrer les tags de visages dans les métadonnées XMP (mode modal) - Version simplifiée avec URLs
 Plugin URI: https://fr.piwigo.org/ext/
 Author: Charles69
-Author URI:
 Has Settings: webmaster
 */
 
-// ============  VERSIONS =========================================================
- // historique des versions
- /*
- version 1.0 - 17/11/2025
-   - Création du plugin pour taguer les visages
-   - Interface de dessin avec Fabric.js
-   - Sauvegarde dans XMP avec exiftool
-   - Compatible avec face_tag (lecture)
+//============= VERSIONS ============================================
+/*
+
+version 1.1A - 24/11/2025
+    corrigé suppression tous les visages
+    corrigé photo sans XMP
+
+version 1.1 - 23/11/2025
+    ok avec les liens symboliques et upload
+    ajout d'une fonction de restauration du fichier original
+    ajout de conditions sur les utilisateurs autorisés
+
+version 1.0A - 23/11/2025
+    sur les fichiers jpg qui se trouvent dans ./galleries
+    prise en compte des tags visage existants
+    deplacement modification des cadres
+    ajout suppression de visage
+
 */
-//=================================================================================
+//====================================================================
 
 if (!defined('PHPWG_ROOT_PATH')) die('Hacking attempt!');
 
@@ -34,17 +43,30 @@ if (basename(dirname(__FILE__)) != 'face_tag_write')
 }
 
 // Plugin constants
-global $prefixeTable;
 define('FACETAGWRITE_ID', basename(dirname(__FILE__)));
 define('FACETAGWRITE_PATH', PHPWG_PLUGINS_PATH . FACETAGWRITE_ID . '/');
-define('FACETAGWRITE_ADMIN', get_root_url() . 'admin.php?page=plugin-' . FACETAGWRITE_ID);
 
-// Initialisation du plugin
+// Logs
+error_reporting(E_ALL);
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
+ini_set('error_log', './plugins/face_tag_write/face_tag_write_debug.log');
+
+  // Charger les classes
+  require_once(FACETAGWRITE_PATH . 'lib/metadata_writer.php');
+  require_once(FACETAGWRITE_PATH . 'lib/metadata_merger.php');
+  require_once(FACETAGWRITE_PATH . 'lib/file_resolver.php');
+require_once(FACETAGWRITE_PATH . 'lib/restore_original.php');
+
+// TEST : Vérifier que la fonction existe
+error_log('TEST: fonction restore existe ? ' . (function_exists('face_tag_write_restore_original') ? 'OUI' : 'NON'));
+
+
+// Initialisation
 add_event_handler('init', 'face_tag_write_init');
 
 function face_tag_write_init()
 {
-  // Charger les traductions
   load_language('plugin.lang', FACETAGWRITE_PATH);
 }
 
@@ -54,7 +76,6 @@ function face_tag_write_load_jquery()
 {
   global $template;
   
-  // Charger jQuery seulement s'il n'est pas déjà chargé
   $template->append('head_elements', '
   <script type="text/javascript">
     if (typeof jQuery === "undefined") {
@@ -64,268 +85,620 @@ function face_tag_write_load_jquery()
   ');
 }
 
-// ==================== AJOUTER LE BOUTON DANS LA PAGE PHOTO ====================
-add_event_handler('loc_end_picture', 'face_tag_write_picture_toolbar');
-
-function face_tag_write_picture_toolbar()
+// ==================== CHARGER NOTRE SCRIPT ====================
+add_event_handler('loc_end_page_tail', 'face_tag_write_load_scripts');
+function face_tag_write_load_scripts()
 {
-  global $template, $user, $picture;
+  global $template, $page;
   
-  // Vérifier les droits (seulement webmaster/admin)
-  if (!is_admin())
-  {
+  if (!isset($page['image_id'])) {
     return;
   }
   
-  $template->set_template_dir(FACETAGWRITE_PATH.'template/');
-  
-  // URL pour le mode édition
-  $edit_url = get_root_url() . 'index.php?/picture/' . $picture['current']['id'] . '&facetag_edit=1';
-  
-  // Construire l'URL AJAX pour la sauvegarde
-  $save_url = get_root_url() . 'ws.php?format=json&method=facetag.saveXMP';
-  
-  // Icône
-  $icon = get_root_url() . 'plugins/' . FACETAGWRITE_ID . '/images/edit.png';
-  
-  // Assigner les variables au template
-  $template->assign(array(
-    'FACETAGWRITE_EDIT_URL' => $edit_url,
-    'FACETAGWRITE_SAVE_URL' => $save_url,
-    'FACETAGWRITE_ICON' => $icon,
-    'FACETAGWRITE_PATH' => FACETAGWRITE_PATH,
-  ));
-  
-  // Choix du template selon le thème
-  if ($user['theme'] == 'bootstrapdefault' || $user['theme'] == 'bootstrap_darkroom') {
-    $tpl_file = 'picture_button_bootstrap.tpl';
-  } else {
-    $tpl_file = 'picture_button.tpl';
-  }
-  
-  // Assigner le template au bloc d'actions
-  $template->set_filename('face_tag_write_button', $tpl_file);
-  $template->concat('PLUGIN_PICTURE_ACTIONS', $template->parse('face_tag_write_button', true));
-}
-
-// ==================== MODE ÉDITION ====================
-add_event_handler('loc_begin_picture', 'face_tag_write_edit_mode');
-
-function face_tag_write_edit_mode()
-{
-  global $template, $picture, $page;
-  
-  // Vérifier si on est en mode édition
-  if (!isset($_GET['facetag_edit']) || !is_admin())
-  {
-    return;
-  }
-  
-  // Charger Fabric.js depuis CDN
-  $template->append('head_elements', '
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
-  ');
-  
-  // URL pour la sauvegarde
-  $save_url = get_root_url() . 'ws.php?format=json&method=facetag.saveXMP';
-  
-  // Assigner les variables
-  $template->assign(array(
-    'FACETAG_EDIT_MODE' => true,
-    'FACETAG_SAVE_URL' => $save_url,
-    'FACETAG_IMAGE_ID' => $picture['current']['id'],
-    'FACETAGWRITE_PATH' => FACETAGWRITE_PATH,
-  ));
-}
-
-// Charger les CSS et JS pour le mode édition
-add_event_handler('loc_end_page_tail', 'face_tag_write_load_assets');
-
-function face_tag_write_load_assets()
-{
-  global $template;
-  
-  // Vérifier si on est en mode édition
-  if (!isset($_GET['facetag_edit']) || !is_admin())
-  {
-    return;
-  }
-  
-  // Charger nos fichiers CSS et JS
   $template->append('footer_elements', '
-  <link rel="stylesheet" href="' . FACETAGWRITE_PATH . 'template/draw_faces.css">
   <script src="' . FACETAGWRITE_PATH . 'template/draw_faces.js"></script>
   ');
 }
 
-// Ajouter l'interface d'édition dans la page
-add_event_handler('loc_end_picture', 'face_tag_write_display_editor', EVENT_HANDLER_PRIORITY_NEUTRAL + 10);
+// ==================== AJOUTER LE BOUTON ====================
+add_event_handler('loc_end_picture', 'face_tag_write_add_button');
 
-function face_tag_write_display_editor()
+// ==================== VÉRIFICATION DES DROITS D'ACCÈS ====================
+function face_tag_write_check_access()
 {
-  global $template, $picture;
+  global $user;
   
-  // Vérifier si on est en mode édition
-  if (!isset($_GET['facetag_edit']) || !is_admin())
+  // Webmaster : accès total
+  if (is_webmaster())
+  {
+    return true;
+  }
+  
+  // Administrateur : accès total
+  if (is_admin())
+  {
+    return true;
+  }
+  
+  // Vérifier si l'utilisateur appartient au groupe 'FaceTag'
+  if (!empty($user['id']))
+  {
+    $query = '
+    SELECT g.name
+    FROM ' . USER_GROUP_TABLE . ' AS ug
+    INNER JOIN ' . GROUPS_TABLE . ' AS g ON ug.group_id = g.id
+    WHERE ug.user_id = ' . intval($user['id']) . '
+    AND g.name = "FaceTag"';
+    
+    $result = pwg_query($query);
+    
+    if (pwg_db_num_rows($result) > 0)
+    {
+      return true;
+    }
+  }
+  
+  // Accès refusé
+  return false;
+}
+
+
+function face_tag_write_add_button()
+{
+  global $template, $picture, $user;
+  
+  // Vérifier les droits d'accès
+  if (!face_tag_write_check_access())
   {
     return;
   }
   
-  // Ajouter l'interface d'édition APRÈS l'image
-  $template->set_template_dir(FACETAGWRITE_PATH.'template/');
-  $template->set_filename('face_tag_write_editor', 'draw_faces.tpl');
-  $template->concat('PLUGIN_PICTURE_AFTER', $template->parse('face_tag_write_editor', true));
+  $query = '
+  SELECT path, file
+  FROM ' . IMAGES_TABLE . '
+  WHERE id = ' . intval($picture['current']['id']);
+  
+  $result = pwg_query($query);
+  $row = pwg_db_fetch_assoc($result);
+  
+  if (!$row) return;
+  
+  $original_path = $row['path'];
+  $image_url = embellish_url(get_root_url() . $original_path);
+  $save_url = get_root_url() . 'ws.php?format=json&method=facetagwrite.saveXMP';
+  
+  $button_html = '
+  <a href="#" 
+     id="facetag-open-editor"
+     data-image-id="' . $picture['current']['id'] . '"
+     data-image-src="' . $image_url . '"
+     data-save-url="' . $save_url . '"
+     class="pwg-state-default pwg-button" 
+     title="Taguer les visages" 
+     rel="nofollow">
+    <span class="pwg-icon">âœï¸</span>
+    <span class="pwg-button-text">Taguer</span>
+  </a>';
+  
+  if ($user['theme'] == 'bootstrapdefault' || $user['theme'] == 'bootstrap_darkroom') {
+    $button_html = '
+    <a href="#" 
+       id="facetag-open-editor"
+       data-image-id="' . $picture['current']['id'] . '"
+       data-image-src="' . $image_url . '"
+       data-save-url="' . $save_url . '"
+       class="btn btn-primary" 
+       title="Taguer les visages" 
+       rel="nofollow">
+      <i class="glyphicon glyphicon-tag"></i> Taguer
+    </a>';
+  }
+  
+  $template->concat('PLUGIN_PICTURE_ACTIONS', $button_html);
 }
 
-// ==================== WEB SERVICES ====================
-add_event_handler('ws_add_methods', 'face_tag_write_ws_add_methods');
+// ==================== WEB SERVICE ====================
+add_event_handler('ws_add_methods', 'face_tag_write_ws_methods');
 
-function face_tag_write_ws_add_methods($arr)
+function face_tag_write_ws_methods($arr)
 {
   $service = &$arr[0];
   
   $service->addMethod(
-    'facetag.saveXMP',
-    'face_tag_write_ws_save_xmp',
+    'facetagwrite.getXMP',
+    'face_tag_write_get_xmp',
     array(
-      'image_id' => array('default' => null),
-      'faces' => array('default' => null),
+      'image_id' => array('default' => null, 'type' => WS_TYPE_INT),
     ),
-    'Sauvegarde les données XMP des visages',
+    'Récupère les données XMP des visages (face_tag_write)',
+    null,
+    array('admin_status' => ACCESS_ADMINISTRATOR)
+  );
+  
+  $service->addMethod(
+    'facetagwrite.saveXMP',
+    'face_tag_write_save_xmp',
+    array(
+      'image_id' => array('default' => null, 'type' => WS_TYPE_INT),
+      'faces' => array('default' => null, 'type' => WS_TYPE_NOTNULL),
+    ),
+    'Sauvegarde les données XMP des visages (face_tag_write)',
+    null,
+    array('admin_status' => ACCESS_ADMINISTRATOR)
+  );
+
+  $service->addMethod(
+    'facetagwrite.restoreOriginal',
+    'face_tag_write_restore_original',
+    array(
+      'image_id' => array('default' => null, 'type' => WS_TYPE_INT),
+    ),
+    'Restaure le fichier .original (supprime tous les tags)',
     null,
     array('admin_status' => ACCESS_ADMINISTRATOR)
   );
 }
 
-function face_tag_write_ws_save_xmp($params, &$service)
+// ==================== WEB SERVICE POUR LIRE LES XMP ====================
+function face_tag_write_get_xmp($params, &$service)
 {
+  $old_error_reporting = error_reporting(E_ERROR | E_PARSE);
+  $old_display_errors = ini_get('display_errors');
+  ini_set('display_errors', '0');
+  
   if (empty($params['image_id']))
   {
+    error_reporting($old_error_reporting);
+    ini_set('display_errors', $old_display_errors);
     return new PwgError(WS_ERR_INVALID_PARAM, 'Missing image_id');
   }
   
-  if (empty($params['faces']))
-  {
-    return new PwgError(WS_ERR_INVALID_PARAM, 'Missing faces data');
-  }
-  
-  // Récupérer le chemin de l'image
   $query = '
-SELECT path
-FROM ' . IMAGES_TABLE . '
-WHERE id = ' . intval($params['image_id']);
+  SELECT path
+  FROM ' . IMAGES_TABLE . '
+  WHERE id = ' . intval($params['image_id']);
   
   $result = pwg_query($query);
   $row = pwg_db_fetch_assoc($result);
   
   if (!$row)
   {
+    error_reporting($old_error_reporting);
+    ini_set('display_errors', $old_display_errors);
     return new PwgError(404, 'Image not found');
   }
   
-  $image_path = PHPWG_ROOT_PATH . $row['path'];
+  // ========== MÉTHODE SIMPLE : LIRE VIA URL ==========
+  $url_base = get_absolute_root_url();
+  $url_picture = $row['path'];
+  $url_picture2 = substr($url_picture, 2); // enlève ./
+  //$url_original = $url_base . $url_picture2;
+// ✅ ENCODER chaque segment du chemin pour gérer les espaces et caractères spéciaux
+$path_parts = explode('/', $url_picture2);
+$encoded_parts = array_map('rawurlencode', $path_parts);
+$url_original = $url_base . implode('/', $encoded_parts) . '?t=' . time();
+
   
-  if (!file_exists($image_path))
-  {
-    return new PwgError(404, 'Image file not found: ' . $image_path);
+  error_log('=== GET XMP ===');
+  error_log('URL originale: ' . $url_original);
+  
+// Télécharger dans un fichier temporaire
+$temp_dir = '/volume1/web/photodev/_data/tmp';
+if (!is_dir($temp_dir)) {
+  mkdir($temp_dir, 0755, true);
+}
+$temp_file = $temp_dir . '/facetag_read_' . uniqid() . '.jpg';
+  
+  $image_content = @file_get_contents($url_original);
+  if ($image_content === false) {
+    error_reporting($old_error_reporting);
+    ini_set('display_errors', $old_display_errors);
+    return new PwgError(500, 'Cannot download image from URL');
   }
   
-  // Décoder les données JSON
-  $faces = json_decode($params['faces'], true);
+  @file_put_contents($temp_file, $image_content);
+  error_log('Image téléchargée: ' . filesize($temp_file) . ' octets');
+
+  if (!extension_loaded('imagick'))
+  {
+    @unlink($temp_file);
+    error_reporting($old_error_reporting);
+    ini_set('display_errors', $old_display_errors);
+    return array(
+      'stat' => 'ok',
+      'result' => array(
+        'xmp' => array('_raw_xmp' => '', 'error' => 'Imagick not loaded'),
+        'orientation' => 1
+      )
+    );
+  }
+  
+  if (function_exists('facetag_extract_xmp')) {
+    $xmp_data = facetag_extract_xmp($temp_file);
+  } else {
+    $xmp_data = face_tag_write_extract_xmp($temp_file);
+  }
+  
+  // Récupérer l'orientation EXIF
+  $orientation = 1;
+  if (function_exists('exif_read_data')) {
+    $exif = @exif_read_data($temp_file);
+    if ($exif && isset($exif['Orientation'])) {
+      $orientation = $exif['Orientation'];
+    }
+  }
+  
+  // Nettoyer
+  //@unlink($temp_file);
+  
+  error_reporting($old_error_reporting);
+  ini_set('display_errors', $old_display_errors);
+  
+  return array(
+    'stat' => 'ok',
+    'result' => array(
+      'xmp' => $xmp_data,
+      'image_id' => $params['image_id'],
+      'orientation' => $orientation
+    )
+  );
+}
+
+// ==================== FONCTION D'EXTRACTION XMP ====================
+function face_tag_write_extract_xmp($image_path)
+{
+  if (!extension_loaded('imagick'))
+  {
+    return array('error' => 'Imagick extension not loaded');
+  }
+  
+  try
+  {
+    $imagick = new Imagick($image_path);
+    
+    $properties = $imagick->getImageProperties();
+    
+    $xmp_data = array();
+    
+    foreach ($properties as $key => $value)
+    {
+      if (strpos($key, 'xmp:') === 0 || 
+          strpos($key, 'dc:') === 0 ||
+          strpos($key, 'Iptc4xmpCore:') === 0 ||
+          strpos($key, 'mwg-rs:') === 0 ||
+          strpos($key, 'MP:') === 0)
+      {
+        $xmp_data[$key] = $value;
+      }
+    }
+    
+    $xmp_profile = $imagick->getImageProfile('xmp');
+    if ($xmp_profile)
+    {
+      $xmp_data['_raw_xmp'] = $xmp_profile;
+    }
+    
+    $imagick->clear();
+    $imagick->destroy();
+    
+    return $xmp_data;
+  }
+  catch (Exception $e)
+  {
+    return array('error' => $e->getMessage());
+  }
+}
+
+// ==================== WEB SERVICE POUR SAUVEGARDER ====================
+function face_tag_write_save_xmp($params, &$service)
+{
+  $old_error_reporting = error_reporting(E_ERROR | E_PARSE);
+  $old_display_errors = ini_get('display_errors');
+  ini_set('display_errors', '0');
+  
+  error_log('=== SAVE XMP REQUEST ===');
+  
+  if (empty($params['image_id']))
+  {
+    error_log('Missing image_id');
+    error_reporting($old_error_reporting);
+    ini_set('display_errors', $old_display_errors);
+    return new PwgError(WS_ERR_INVALID_PARAM, 'Missing image_id');
+  }
+  
+  if (empty($params['faces']))
+  {
+    error_log('âŒ Missing faces data');
+    error_reporting($old_error_reporting);
+    ini_set('display_errors', $old_display_errors);
+    return new PwgError(WS_ERR_INVALID_PARAM, 'Missing faces data');
+  }
+  
+  $faces_json = $params['faces'];
+  
+  if (strpos($faces_json, '\\"') !== false) {
+    $faces_json = stripslashes($faces_json);
+  }
+  
+  $faces = json_decode($faces_json, true);
   
   if (!is_array($faces))
   {
-    return new PwgError(WS_ERR_INVALID_PARAM, 'Invalid faces data format');
+    error_reporting($old_error_reporting);
+    ini_set('display_errors', $old_display_errors);
+    return new PwgError(WS_ERR_INVALID_PARAM, 'Invalid faces data');
   }
   
-  // Écrire les XMP avec exiftool
-  $result = face_tag_write_xmp_with_exiftool($image_path, $faces);
+  // Permettre tableau vide pour supprimer tous les tags
+  if (count($faces) === 0) {
+    error_log('-> Suppression de tous les visages (tableau vide)');
+  }
+  
+  error_log('-> ' . count($faces) . ' visages à  enregistrer');
+  
+  $query = '
+  SELECT path
+  FROM ' . IMAGES_TABLE . '
+  WHERE id = ' . intval($params['image_id']);
+  
+  $result = pwg_query($query);
+  $row = pwg_db_fetch_assoc($result);
+  
+  if (!$row)
+  {
+    error_reporting($old_error_reporting);
+    ini_set('display_errors', $old_display_errors);
+    return new PwgError(404, 'Image not found');
+  }
+  
+  // Construire l'URL pour télécharger
+  $url_base = get_absolute_root_url();
+  $url_picture = $row['path'];
+  $url_picture2 = substr($url_picture, 2); // enlève ./
+  //$url_original = $url_base . $url_picture2;
+
+  // ✅ ENCODER chaque segment du chemin
+$path_parts = explode('/', $url_picture2);
+$encoded_parts = array_map('rawurlencode', $path_parts);
+$url_original = $url_base . implode('/', $encoded_parts) . '?t=' . time();
+  
+  error_log('URL: ' . $url_original);
+  
+// Télécharger dans un fichier temporaire
+$temp_dir = '/volume1/web/photodev/_data/tmp';
+if (!is_dir($temp_dir)) {
+  mkdir($temp_dir, 0755, true);
+}
+$temp_file = $temp_dir . '/facetag_write_' . uniqid() . '.jpg';
+  
+  $image_content = @file_get_contents($url_original);
+  if ($image_content === false) {
+    error_reporting($old_error_reporting);
+    ini_set('display_errors', $old_display_errors);
+    return new PwgError(500, 'Cannot download image from URL');
+  }
+  
+  @file_put_contents($temp_file, $image_content);
+  error_log('Image téléchargée: ' . filesize($temp_file) . ' octets');
+  
+// Construire le chemin local et le résoudre (gère les liens symboliques)
+  $real_local_path = face_tag_write_resolve_path($row['path']);
+  
+  if ($real_local_path === false) {
+    error_log('❌ Impossible de résoudre le chemin du fichier');
+    @unlink($temp_file);
+    error_reporting($old_error_reporting);
+    ini_set('display_errors', $old_display_errors);
+    return new PwgError(500, 'Cannot resolve file path');
+  }
+  
+  error_log('Chemin local résolu: ' . $real_local_path);
+  
+  // Vérifier que le fichier existe et est accessible
+  if (!file_exists($real_local_path)) {
+    error_log('❌ Le fichier n\'existe pas: ' . $real_local_path);
+    @unlink($temp_file);
+    error_reporting($old_error_reporting);
+    ini_set('display_errors', $old_display_errors);
+    return new PwgError(404, 'File not found at resolved path');
+  }
+  
+  // Vérifier les permissions en lecture
+  if (!is_readable($real_local_path)) {
+    error_log('❌ Le fichier n\'est pas lisible');
+    @unlink($temp_file);
+    error_reporting($old_error_reporting);
+    ini_set('display_errors', $old_display_errors);
+    return new PwgError(403, 'File is not readable');
+  }
+  
+  // Créer backup
+  // Créer un fichier temporaire pour lire les métadonnées originales
+  $temp_for_reading = $temp_dir . '/facetag_read_' . uniqid() . '.jpg';
+  @file_put_contents($temp_for_reading, $image_content);
+  
+  error_log('Fichier pour lecture métadonnées: ' . $temp_for_reading);
+  
+  // Créer backup
+  $backup_path = $real_local_path . '.original';
+  $backup_created = false;
+  
+  if (!file_exists($backup_path)) {
+    if (@copy($real_local_path, $backup_path)) {
+      @chmod($backup_path, 0444);
+      $backup_created = true;
+      error_log('Backup créé');
+    }
+  } else {
+    error_log('Backup existe déjà');
+  }
+  
+  // IMPORTANT : Toujours rendre le fichier writable avant modification
+  // (car il peut avoir été mis en 0644 lors d'une précédente sauvegarde)
+  @chmod($real_local_path, 0666);
+  error_log('Permissions du fichier mises à 0666 pour permettre l\'écriture');
+  
+// ✅ AJOUTER CE LOG
+$perms = fileperms($real_local_path);
+error_log('Permissions actuelles: ' . decoct($perms & 0777));
+
+
+  
+  $writer = new FaceTagMetadataWriter();
+  $merger = new FaceTagMetadataMerger();
+  
+  // Fusionner métadonnées (on passe le fichier de lecture pour lire les métadonnées existantes)
+  $merged_data = $merger->merge($temp_for_reading, $faces);
+  error_log('Métadonnées fusionnées');
+  
+  // Nettoyer le fichier de lecture
+  //@unlink($temp_for_reading);
+  
+  // Écrire métadonnées sur le fichier temporaire
+  try {
+    $result = $writer->writeMetadata($temp_file, $faces, $merged_data);
+  } catch (Exception $e) {
+    error_log('Exception: ' . $e->getMessage());
+    @unlink($temp_file);
+    error_reporting($old_error_reporting);
+    ini_set('display_errors', $old_display_errors);
+    return new PwgError(500, 'Exception: ' . $e->getMessage());
+  }
   
   if ($result['success'])
   {
+    error_log(' XMP écrit sur fichier temporaire');
+    
+    // Essayer d'écrire sur le chemin résolu
+    error_log('>> main.inc.php');
+    error_log('Tentative copie vers: ' . $real_local_path);
+    error_log('Fichier existe: ' . (file_exists($real_local_path) ? 'OUI' : 'NON'));
+    error_log('Writable: ' . (is_writable($real_local_path) ? 'OUI' : 'NON'));
+    
+    if (@copy($temp_file, $real_local_path)) {
+      error_log('Fichier copié vers: ' . $real_local_path);
+      @chmod($real_local_path, 0644);
+    } else {
+      error_log('Échec copie - Dernière tentative: écriture directe');
+      
+      // Dernière tentative : lire le temp et écrire directement
+      $content = file_get_contents($temp_file);
+      if (@file_put_contents($real_local_path, $content) !== false) {
+        error_log('Écriture directe réussie');
+        @chmod($real_local_path, 0644);
+      } else {
+        error_log('Toutes les méthodes ont échoué');
+        @unlink($temp_file);
+        error_reporting($old_error_reporting);
+        ini_set('display_errors', $old_display_errors);
+        return new PwgError(500, 'Cannot write to file - check permissions on: ' . $real_local_path);
+      }
+    }
+    
+    // Nettoyer le fichier temporaire
+   // @unlink($temp_file);
+    
+    // Régénérer les miniatures
+    try {
+      face_tag_write_regenerate_derivatives($params['image_id']);
+      error_log(' Miniatures régénérées');
+    } catch (Exception $e) {
+      error_log('Erreur miniatures: ' . $e->getMessage());
+    }
+    
+    
+    error_reporting($old_error_reporting);
+    ini_set('display_errors', $old_display_errors);
+    
     return array(
       'stat' => 'ok',
-      'message' => 'XMP data saved successfully',
-      'faces_count' => count($faces)
+      'message' => 'XMP saved successfully',
+      'faces_count' => count($faces),
+      'backup_created' => $backup_created
     );
   }
   else
   {
+    error_log(' Échec écriture XMP: ' . $result['error']);
+    @unlink($temp_file);
+    error_reporting($old_error_reporting);
+    ini_set('display_errors', $old_display_errors);
     return new PwgError(500, 'Failed to write XMP: ' . $result['error']);
   }
 }
 
-// ==================== FONCTION D'ÉCRITURE XMP ====================
-function face_tag_write_xmp_with_exiftool($image_path, $faces)
+// ==================== RÉGÉNÉRER LES MINIATURES ET SYNCHRONISER ====================
+function face_tag_write_regenerate_derivatives($image_id)
 {
-  // Vérifier que exiftool est disponible
-  exec('exiftool -ver 2>&1', $output, $return_code);
-  
-  if ($return_code !== 0)
-  {
-    return array(
-      'success' => false,
-      'error' => 'exiftool not available. Please install exiftool on your server.'
-    );
-  }
-  
-  // Préparer les arguments exiftool
-  $args = array();
-  
-  // Supprimer toutes les anciennes régions
-  $args[] = '-RegionInfo=';
-  
-  // Ajouter chaque visage
-  foreach ($faces as $index => $face)
-  {
-    $name = $face['name'];
-    $x = $face['x'];
-    $y = $face['y'];
-    $w = $face['w'];
-    $h = $face['h'];
+  // ==================== RÉGÉNÉRATION DES MINIATURES ====================
+  if (defined('IMAGE_DERIVATIVES_TABLE') && defined('PWG_DERIVATIVE_DIR')) {
+    $query = '
+    SELECT id, path
+    FROM ' . IMAGES_TABLE . '
+    WHERE id = ' . intval($image_id);
     
-    // Format mwg-rs (Metadata Working Group - Regions Schema)
-    // Compatible avec digiKam, Lightroom, Windows Photos, etc.
+    $result = pwg_query($query);
+    $image = pwg_db_fetch_assoc($result);
     
-    // Ajouter une région
-    $args[] = '-RegionName=' . escapeshellarg($name);
-    $args[] = '-RegionType=Face';
-    $args[] = '-RegionAreaX=' . $x;
-    $args[] = '-RegionAreaY=' . $y;
-    $args[] = '-RegionAreaW=' . $w;
-    $args[] = '-RegionAreaH=' . $h;
-    $args[] = '-RegionAreaUnit=normalized';
+    if ($image) {
+      // Supprimer les entrées de la base de données
+      $query = '
+      DELETE FROM ' . IMAGE_DERIVATIVES_TABLE . '
+      WHERE image_id = ' . intval($image_id);
+      pwg_query($query);
+      
+      // Supprimer les fichiers physiques
+      $path_info = pathinfo($image['path']);
+      
+      $derivative_dirs = array(
+        PHPWG_ROOT_PATH . PWG_DERIVATIVE_DIR . 'square/',
+        PHPWG_ROOT_PATH . PWG_DERIVATIVE_DIR . 'thumb/',
+        PHPWG_ROOT_PATH . PWG_DERIVATIVE_DIR . 'small/',
+        PHPWG_ROOT_PATH . PWG_DERIVATIVE_DIR . 'medium/',
+        PHPWG_ROOT_PATH . PWG_DERIVATIVE_DIR . 'large/',
+        PHPWG_ROOT_PATH . PWG_DERIVATIVE_DIR . 'xlarge/',
+        PHPWG_ROOT_PATH . PWG_DERIVATIVE_DIR . 'xxlarge/',
+      );
+      
+      foreach ($derivative_dirs as $dir) {
+        if (is_dir($dir)) {
+          $pattern = $dir . '*/' . $path_info['filename'] . '*';
+          $files = glob($pattern);
+          if ($files) {
+            foreach ($files as $file) {
+              @unlink($file);
+            }
+          }
+        }
+      }
+      
+      error_log('✓ Miniatures régénérées');
+    }
+  } else {
+    error_log('⚠ Constantes miniatures non définies - Synchronisation uniquement');
   }
   
-  // Options de préservation
-  $args[] = '-overwrite_original'; // Ne pas créer de backup
-  $args[] = '-P'; // Préserver la date de modification
-  
-  // Ajouter le chemin de l'image
-  $args[] = escapeshellarg($image_path);
-  
-  // Construire la commande complète
-  $cmd = 'exiftool ' . implode(' ', $args) . ' 2>&1';
-  
-  // Exécuter
-  exec($cmd, $output, $return_code);
-  
-  if ($return_code === 0)
-  {
-    return array(
-      'success' => true,
-      'output' => implode("\n", $output),
-      'command' => $cmd
-    );
+  // ==================== SYNCHRONISATION DES MÉTADONNÉES PIWIGO ====================
+  // Charger TOUS les fichiers nécessaires
+  if (!function_exists('sync_metadata')) {
+    include_once(PHPWG_ROOT_PATH . 'admin/include/functions_metadata.php');
   }
-  else
-  {
-    return array(
-      'success' => false,
-      'error' => implode("\n", $output),
-      'command' => $cmd
-    );
+  
+  if (!function_exists('tag_id_from_tag_name')) {
+    include_once(PHPWG_ROOT_PATH . 'admin/include/functions.php');
   }
+  
+  try {
+    sync_metadata(array($image_id));
+    error_log('✓ Métadonnées Piwigo synchronisées pour image ' . $image_id);
+  } catch (Exception $e) {
+    error_log('⚠ Erreur synchronisation des métadonnées: ' . $e->getMessage());
+  }
+  
+ return true;
 }
+
+
+
 
 ?>

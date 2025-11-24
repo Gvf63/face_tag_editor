@@ -1,0 +1,15 @@
+{
+  "write_fields": {
+    "exif_xpkeywords": true,
+    "iptc_keywords": true,
+    "iptc_standards": true,
+    "xmp_subject": true,
+    "xmp_hierarchical": true,
+    "xmp_tagslist": true,
+    "xmp_catalogsets": true,
+    "xmp_lastkeyword": false,
+    "xmp_categories": false
+  },
+  "category_format": "Personnes|{name}",
+  "tags_format": "Personnes/{name}"
+}
