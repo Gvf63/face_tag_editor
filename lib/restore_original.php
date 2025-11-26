@@ -76,7 +76,7 @@ function face_tag_write_restore_original($params, &$service)
   // Rendre le fichier actuel writable
   @chmod($real_local_path, 0666);
   
-  // Copier le backup par-dessus le fichier actuel
+// Copier le backup par-dessus le fichier actuel
   if (!@copy($backup_path, $real_local_path)) {
     error_log('❌ Échec de la copie du backup');
     error_reporting($old_error_reporting);
@@ -85,6 +85,13 @@ function face_tag_write_restore_original($params, &$service)
   }
   
   error_log('✅ Fichier original restauré');
+  
+  // Supprimer le fichier .original maintenant qu'il a été restauré
+  if (@unlink($backup_path)) {
+    error_log('✅ Fichier .original supprimé');
+  } else {
+    error_log('⚠️ Impossible de supprimer le fichier .original');
+  }
   
   // Régénérer les miniatures
   face_tag_write_regenerate_derivatives($params['image_id']);

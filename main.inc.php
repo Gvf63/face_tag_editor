@@ -1,7 +1,7 @@
 <?php
 /*
-Plugin Name: face_tag_write
-Version: 1.1
+Plugin Name: face_tag_editor
+Version: 1.2C
 Description: Créer et enregistrer les tags de visages dans les métadonnées XMP (mode modal) - Version simplifiée avec URLs
 Plugin URI: https://fr.piwigo.org/ext/
 Author: Charles69
@@ -10,10 +10,24 @@ Has Settings: webmaster
 
 //============= VERSIONS ============================================
 /*
+version 1.2C - 26/11/2025
+    aspect visuel css svg
+    ajouté logs
 
-version 1.1A - 24/11/2025
+version 1.2B - 26/11/2025
+    ajouté logs
+
+version 1.2A 25/11/2025
+    suppression de .jpg.original après une restauration
+    corrigé rotation type 6 = 90 CW
+    bouton taguer noir & blanc
+
+version 1.2 - 24/11/2025 
+    changement de nom du plugin face_tag_editor
     corrigé suppression tous les visages
     corrigé photo sans XMP
+    message en clair quand les fichiers sont verrouillés
+    décommenter @unlink effact fichiers temporaires
 
 version 1.1 - 23/11/2025
     ok avec les liens symboliques et upload
@@ -31,32 +45,36 @@ version 1.0A - 23/11/2025
 
 if (!defined('PHPWG_ROOT_PATH')) die('Hacking attempt!');
 
-if (basename(dirname(__FILE__)) != 'face_tag_write')
+if (basename(dirname(__FILE__)) != 'face_tag_editor')
 {
-  add_event_handler('init', 'face_tag_write_error');
-  function face_tag_write_error()
+  add_event_handler('init', 'face_tag_editor_error');
+  function face_tag_editor_error()
   {
     global $page;
-    $page['errors'][] = 'Uninstall the plugin and rename it to "face_tag_write"';
+    $page['errors'][] = 'Désactiver le plugin et renommer le répertoire  "face_tag_editor"';
   }
   return;
 }
 
+// changt de nom du plugin de face_tag_write à face_tag_editor , mais les noms des variables sont restées tag_face_write
+
 // Plugin constants
 define('FACETAGWRITE_ID', basename(dirname(__FILE__)));
 define('FACETAGWRITE_PATH', PHPWG_PLUGINS_PATH . FACETAGWRITE_ID . '/');
+define('FACETAGWRITE_ADMIN', get_root_url() . 'admin.php?page=plugin-' . FACETAGWRITE_ID); // admin.php?page=plugin-face_tag_editor
 
 // Logs
 error_reporting(E_ALL);
 ini_set('display_errors', 0);
 ini_set('log_errors', 1);
-ini_set('error_log', './plugins/face_tag_write/face_tag_write_debug.log');
+ini_set('error_log', './plugins/face_tag_editor/face_tag_editor_debug.log');
 
   // Charger les classes
-  require_once(FACETAGWRITE_PATH . 'lib/metadata_writer.php');
-  require_once(FACETAGWRITE_PATH . 'lib/metadata_merger.php');
-  require_once(FACETAGWRITE_PATH . 'lib/file_resolver.php');
+require_once(FACETAGWRITE_PATH . 'lib/metadata_writer.php');
+require_once(FACETAGWRITE_PATH . 'lib/metadata_merger.php');
+require_once(FACETAGWRITE_PATH . 'lib/file_resolver.php');
 require_once(FACETAGWRITE_PATH . 'lib/restore_original.php');
+require_once(FACETAGWRITE_PATH . 'img/icon_svg.php'); // image du bouton taguer
 
 // TEST : Vérifier que la fonction existe
 error_log('TEST: fonction restore existe ? ' . (function_exists('face_tag_write_restore_original') ? 'OUI' : 'NON'));
@@ -82,6 +100,18 @@ function face_tag_write_load_jquery()
       document.write(\'<script type="text/javascript" src="' . get_root_url() . 'themes/default/js/jquery.min.js"><\/script>\');
     }
   </script>
+  ');
+}
+
+// ==================== CHARGER LE CSS DU BOUTON ====================
+add_event_handler('loc_begin_page_header', 'face_tag_write_load_css');
+function face_tag_write_load_css()
+{
+  global $template;
+  
+  $template->append('head_elements', '
+  <link rel="stylesheet" href="' . FACETAGWRITE_PATH . 'css/face_tag_button.css">
+  <link rel="stylesheet" href="' . FACETAGWRITE_PATH . 'css/face_tag_modal.css">
   ');
 }
 
@@ -167,32 +197,41 @@ function face_tag_write_add_button()
   $image_url = embellish_url(get_root_url() . $original_path);
   $save_url = get_root_url() . 'ws.php?format=json&method=facetagwrite.saveXMP';
   
-  $button_html = '
+// Vérifier si le fichier .original existe
+  $real_local_path = face_tag_write_resolve_path($row['path']);
+  $has_original = file_exists($real_local_path . '.original') ? 'true' : 'false';
+
+
+// VERSION 1 : Thème par défaut - SANS styles inline
+$button_html = '
   <a href="#" 
      id="facetag-open-editor"
      data-image-id="' . $picture['current']['id'] . '"
      data-image-src="' . $image_url . '"
      data-save-url="' . $save_url . '"
+     data-has-original="' . $has_original . '"
      class="pwg-state-default pwg-button" 
      title="Taguer les visages" 
      rel="nofollow">
-    <span class="pwg-icon">âœï¸</span>
+    <span class="pwg-icon">' . FACETAGWRITE_ICON . '</span>
     <span class="pwg-button-text">Taguer</span>
   </a>';
-  
-  if ($user['theme'] == 'bootstrapdefault' || $user['theme'] == 'bootstrap_darkroom') {
-    $button_html = '
+
+// VERSION 2 : Thèmes Bootstrap - SANS styles inline
+if ($user['theme'] == 'bootstrapdefault' || $user['theme'] == 'bootstrap_darkroom') {
+  $button_html = '
     <a href="#" 
        id="facetag-open-editor"
        data-image-id="' . $picture['current']['id'] . '"
        data-image-src="' . $image_url . '"
        data-save-url="' . $save_url . '"
+       data-has-original="' . $has_original . '"
        class="btn btn-primary" 
        title="Taguer les visages" 
        rel="nofollow">
-      <i class="glyphicon glyphicon-tag"></i> Taguer
+      ' . FACETAGWRITE_ICON . ' Taguer
     </a>';
-  }
+}
   
   $template->concat('PLUGIN_PICTURE_ACTIONS', $button_html);
 }
@@ -245,9 +284,13 @@ function face_tag_write_get_xmp($params, &$service)
   $old_error_reporting = error_reporting(E_ERROR | E_PARSE);
   $old_display_errors = ini_get('display_errors');
   ini_set('display_errors', '0');
+
+  error_log('=== GET XMP START ===');
+  error_log('288 - Image ID: ' . $params['image_id']);
   
   if (empty($params['image_id']))
   {
+    error_log('ERROR: Missing image_id');
     error_reporting($old_error_reporting);
     ini_set('display_errors', $old_display_errors);
     return new PwgError(WS_ERR_INVALID_PARAM, 'Missing image_id');
@@ -260,6 +303,8 @@ function face_tag_write_get_xmp($params, &$service)
   
   $result = pwg_query($query);
   $row = pwg_db_fetch_assoc($result);
+
+  error_log('STEP1: Query executed');
   
   if (!$row)
   {
@@ -280,7 +325,7 @@ $url_original = $url_base . implode('/', $encoded_parts) . '?t=' . time();
 
   
   error_log('=== GET XMP ===');
-  error_log('URL originale: ' . $url_original);
+  error_log('327 - URL originale: ' . $url_original);
   
 // Télécharger dans un fichier temporaire
 $temp_dir = '/volume1/web/photodev/_data/tmp';
@@ -297,10 +342,11 @@ $temp_file = $temp_dir . '/facetag_read_' . uniqid() . '.jpg';
   }
   
   @file_put_contents($temp_file, $image_content);
-  error_log('Image téléchargée: ' . filesize($temp_file) . ' octets');
+  error_log('STEP3 : Temp file size image téléchargée: ' . filesize($temp_file) . ' octets');
 
   if (!extension_loaded('imagick'))
   {
+    error_log('ERROR: Imagick not loaded'); 
     @unlink($temp_file);
     error_reporting($old_error_reporting);
     ini_set('display_errors', $old_display_errors);
@@ -314,26 +360,36 @@ $temp_file = $temp_dir . '/facetag_read_' . uniqid() . '.jpg';
   }
   
   if (function_exists('facetag_extract_xmp')) {
+    error_log('STEP4: Using facetag_extract_xmp');
     $xmp_data = facetag_extract_xmp($temp_file);
   } else {
+    error_log('STEP4: Using face_tag_write_extract_xmp'); 
     $xmp_data = face_tag_write_extract_xmp($temp_file);
   }
   
   // Récupérer l'orientation EXIF
   $orientation = 1;
   if (function_exists('exif_read_data')) {
+    error_log('STEP5: Reading EXIF');
     $exif = @exif_read_data($temp_file);
     if ($exif && isset($exif['Orientation'])) {
       $orientation = $exif['Orientation'];
+      error_log('STEP5: Orientation = ' . $orientation); 
+    }else{
+      error_log('STEP5: No orientation found, using 1'); 
     }
+  }else{
+    error_log('ERROR: exif_read_data not available'); 
   }
   
   // Nettoyer
-  //@unlink($temp_file);
+  @unlink($temp_file);
   
   error_reporting($old_error_reporting);
   ini_set('display_errors', $old_display_errors);
   
+  error_log('SUCCESS: Returning data');
+
   return array(
     'stat' => 'ok',
     'result' => array(
@@ -552,7 +608,7 @@ error_log('Permissions actuelles: ' . decoct($perms & 0777));
   error_log('Métadonnées fusionnées');
   
   // Nettoyer le fichier de lecture
-  //@unlink($temp_for_reading);
+  @unlink($temp_for_reading);
   
   // Écrire métadonnées sur le fichier temporaire
   try {
@@ -596,7 +652,7 @@ error_log('Permissions actuelles: ' . decoct($perms & 0777));
     }
     
     // Nettoyer le fichier temporaire
-   // @unlink($temp_file);
+    @unlink($temp_file);
     
     // Régénérer les miniatures
     try {

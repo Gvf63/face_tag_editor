@@ -6,6 +6,8 @@
   
   $(document).ready(function() {
     
+    // Dans la console du navigateur
+    console.log($('link[href*="font-awesome"]').attr('href'));
     console.log('Face Tag Write: Script chargé )');
     
     var canvas = null;
@@ -18,7 +20,8 @@
     // Variables partagées pour stocker les XMP (comme face_tag)
     var xmpData = null;
     var existingFaces = [];
-    
+    var hasOriginal = false;
+
     // ==================== FONCTION DE TRANSFORMATION DES COORDONNÉES (EXIF) ====================
     // Fonction pour transformer les coordonnées selon l'orientation EXIF
     // Valeurs possibles : 1-8 (voir spec EXIF)
@@ -51,11 +54,9 @@
           return {left: newLeft, top: newTop, width: newWidth, height: newHeight};
           
 case 6: // Rotate 90 CW
-  // L'image est tournée de 90° dans le sens horaire
-  // Un point en bas à gauche de l'original apparaît en haut à gauche après rotation
-  // Formule correcte : x' = y, y' = 100 - x - w
-  newLeft = top;
-  newTop = 100 - left - width;
+  // Pour afficher correctement après rotation
+  newLeft = 100 - top - height;
+  newTop = left;
   newWidth = height;
   newHeight = width;
   return {left: newLeft, top: newTop, width: newWidth, height: newHeight};
@@ -111,10 +112,9 @@ function inverseTransformCoordinates(left, top, width, height, orientation) {
       return {left: newLeft, top: newTop, width: newWidth, height: newHeight};
       
 case 6: // Rotate 90 CW - INVERSE
-  // Affichage: x' = y, y' = 100 - x - w
-  // Inverse: y = x', x = 100 - y' - h
-  newLeft = 100 - top - height;
-  newTop = left;
+  // Inverse: x_orig = y_ecran, y_orig = 100 - x_ecran - w_ecran
+  newLeft = top;
+  newTop = 100 - left - width;
   newWidth = height;
   newHeight = width;
   return {left: newLeft, top: newTop, width: newWidth, height: newHeight};
@@ -179,6 +179,11 @@ case 6: // Rotate 90 CW - INVERSE
       imageId = $(this).data('image-id');
       imageSrc = $(this).data('image-src');
       saveUrl = $(this).data('save-url');
+      imageSrc = $(this).data('image-src');
+      saveUrl = $(this).data('save-url');
+      hasOriginal = $(this).data('has-original');
+      
+      console.log('Has original:', hasOriginal);
       
       console.log('Image ID:', imageId);
       console.log('Image URL:', imageSrc);
@@ -197,66 +202,63 @@ case 6: // Rotate 90 CW - INVERSE
       // Supprimer les modales existantes
       $('#facetag-modal, #facetag-modal-overlay').remove();
       
-      var modalHtml = `
-        <div id="facetag-modal-overlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:9998;"></div>
-        
-        <div id="facetag-modal" style="position:fixed; top:0; left:0; width:100%; height:100%; z-index:9999; display:flex; flex-direction:column; background:#1a1a1a;">
-          
-          <!-- Header -->
-          <div style="background:#4CAF50; color:white; padding:12px 20px; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
-            <h3 style="margin:0; font-size:18px;">✏️ Éditeur de visages - Image #${imageId}</h3>
-            <button id="facetag-close-modal" style="background:none; border:none; color:white; font-size:28px; cursor:pointer; padding:0; width:35px; height:35px; line-height:35px;">&times;</button>
-          </div>
-          
-          <!-- Instructions -->
-          <div style="padding:10px 20px; background:#2a2a2a; border-bottom:1px solid #444; flex-shrink:0;">
-            <p style="margin:0; color:#ccc; font-size:14px;">
-              <strong>Instructions :</strong> Cliquez et faites glisser sur l'image pour dessiner un rectangle autour d'un visage.
-            </p>
-          </div>
-          
-          <!-- Contenu principal -->
-          <div style="display:flex; flex:1; overflow:hidden;">
-            
-            <!-- Zone image + canvas (prend tout l'espace disponible) -->
-            <div style="flex:1; padding:20px; background:#1a1a1a; display:flex; align-items:center; justify-content:center; overflow:auto;">
-              <div id="facetag-canvas-wrapper" style="position:relative;">
-                <canvas id="facetag-canvas"></canvas>
-              </div>
-            </div>
-            
-            <!-- Sidebar : liste des visages -->
-            <div style="width:320px; padding:20px; background:#2a2a2a; border-left:1px solid #444; overflow-y:auto; flex-shrink:0;">
-              <h4 style="margin-top:0; padding-bottom:10px; border-bottom:2px solid #4CAF50; color:#fff;">👤 Visages tagués (<span id="facetag-count">0</span>)</h4>
-              <div id="facetag-faces-list">
-                <p style="color:#999; text-align:center; padding:20px;">Aucun visage tagué</p>
-              </div>
-            </div>
-            
-          </div>
-          
-<!-- Footer : boutons -->
-          <div style="padding:12px 20px; background:#2a2a2a; border-top:1px solid #444; display:flex; justify-content:space-between; flex-shrink:0;">
-            <div>
-              <button id="facetag-clear-all" style="padding:10px 20px; background:#ff4444; color:white; border:none; border-radius:4px; cursor:pointer; font-size:14px;">
-                🗑️ Tout effacer
-              </button>
-              <button id="facetag-restore-original" style="padding:10px 20px; margin-left:10px; background:#ff9800; color:white; border:none; border-radius:4px; cursor:pointer; font-size:14px;" title="Restaurer le fichier .original (supprime tous les tags)">
-                ⏮️ Restaurer l'original
-              </button>
-            </div>
-            <div>
-              <button id="facetag-cancel" style="padding:10px 20px; margin-right:10px; background:#666; color:white; border:none; border-radius:4px; cursor:pointer; font-size:14px;">
-                Annuler
-              </button>
-              <button id="facetag-save-xmp" style="padding:10px 24px; background:#4CAF50; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold; font-size:14px;">
-                💾 Enregistrer dans XMP
-              </button>
-            </div>
-          </div>
-      `;
+var modalHtml = `
+  <div id="facetag-modal-overlay"></div>
+  
+  <div id="facetag-modal">
+    
+    <!-- Header -->
+    <div class="modal-header">
+      <h3>✏️ Éditeur de visages - Image #${imageId}</h3>
+      <button id="facetag-close-modal">&times;</button>
+    </div>
+    
+    <!-- Instructions -->
+    <div class="modal-instructions">
+      <p><strong>Instructions :</strong> Cliquez et faites glisser sur l'image pour dessiner un rectangle autour d'un visage.</p>
+    </div>
+    
+    <!-- Contenu principal -->
+    <div class="modal-content">
+      
+      <!-- Zone image + canvas -->
+      <div class="modal-canvas-area">
+        <div id="facetag-canvas-wrapper">
+          <canvas id="facetag-canvas"></canvas>
+        </div>
+      </div>
+      
+      <!-- Sidebar : liste des visages -->
+      <div class="modal-sidebar">
+        <h4>👤 Visages tagués (<span id="facetag-count">0</span>)</h4>
+        <div id="facetag-faces-list">
+          <p>Aucun visage tagué</p>
+        </div>
+      </div>
+      
+    </div>
+    
+    <!-- Footer : boutons -->
+    <div class="modal-footer">
+      <div class="modal-footer-left">
+        <button id="facetag-clear-all">🗑️ Tout effacer</button>
+        <button id="facetag-restore-original" style="display:none;" title="Restaurer le fichier .original (supprime tous les tags)">⮪️ Restaurer l'original</button>
+      </div>
+      <div class="modal-footer-right">
+        <button id="facetag-cancel">Annuler</button>
+        <button id="facetag-save-xmp">💾 Enregistrer dans XMP</button>
+      </div>
+    </div>
+    
+  </div>
+`;
       
       $('body').append(modalHtml);
+
+            // Afficher le bouton "Restaurer" seulement si un fichier .original existe
+      if (hasOriginal) {
+        $('#facetag-restore-original').show();
+      }
       
       // Charger l'image et initialiser le canvas
       loadImageAndInitCanvas();
@@ -265,12 +267,19 @@ case 6: // Rotate 90 CW - INVERSE
       $('#facetag-close-modal, #facetag-cancel').click(closeModal);
       
       // Événement d'enregistrement
-  $('#facetag-save-xmp').click(function() {
-        console.log("click sur Enregistrer");
+$('#facetag-save-xmp').click(function() {
+        console.log("=== CLIC SUR ENREGISTRER ===");
+        console.log("Image ID:", imageId);
+        console.log("Nombre de visages:", faces.length);
+        
+        // Permettre l'enregistrement même avec 0 visages (pour supprimer tous les tags)
         if (faces.length === 0) {
+          console.log("⚠️ Aucun visage - demande de confirmation");
           if (!confirm('Voulez-vous vraiment supprimer tous les tags de visages de cette image ?')) {
+            console.log("❌ Annulation par l'utilisateur");
             return;
           }
+          console.log("✅ Confirmation de suppression");
         }
         
         var facesData = faces.map(function(face) {
@@ -283,27 +292,35 @@ case 6: // Rotate 90 CW - INVERSE
           };
         });
         
-        console.log('Sauvegarde:', facesData);
-        console.log('JSON:', JSON.stringify(facesData));
+        console.log('📦 Données à enregistrer:', facesData);
+        console.log('📄 JSON:', JSON.stringify(facesData));
+        console.log('🌐 URL:', saveUrl);
         
         $(this).prop('disabled', true).text('Enregistrement...');
+        console.log("🔒 Bouton désactivé");
         
         // Créer un FormData pour envoyer en POST
         var formData = new FormData();
         formData.append('image_id', imageId);
         formData.append('faces', JSON.stringify(facesData));
         
-        $.ajax({
+        console.log('=== DEBUG AJAX ===');
+        console.log('URL:', saveUrl);
+        console.log('FormData:', {
+          image_id: imageId,
+          faces: JSON.stringify(facesData)
+        });
+
+
+$.ajax({
           url: saveUrl,
           type: 'POST',
           data: formData,
           processData: false,
           contentType: false,
           dataType: 'json',
-
-  /// -------------------------------------------------------------
-success: function(data) {
-  console.log('Réponse serveur:', data);
+          success: function(data) {
+            console.log('Réponse:', data);
   
   var result = data.result || data;
   
@@ -332,7 +349,11 @@ success: function(data) {
 },
 
 error: function(xhr, status, error) {
-  console.error('Erreur AJAX:', xhr.responseText);
+  console.error('358-❌ ERREUR AJAX');
+            console.error('Status:', status);
+            console.error('Error:', error);
+            console.error('Response:', xhr.responseText);
+            console.error('Status Code:', xhr.status);
   
   // Vérifier si c'est une fausse erreur (succès en réalité)
   try {
@@ -345,12 +366,29 @@ error: function(xhr, status, error) {
     }
   } catch(e) {}
   
-  alert('Erreur de connexion: ' + error);
+ // alert('348 - Erreur de connexion: ' + error);
 },
 
           error: function(xhr, status, error) {
-            console.error('Erreur AJAX:', xhr.responseText);
-            alert('Erreur de connexion: ' + error);
+            console.error('379 ❌ ERREUR AJAX');
+            console.error('Status:', status);
+            console.error('Error:', error);
+            console.error('Response:', xhr.responseText);
+            console.error('Status Code:', xhr.status);
+
+            var errorMsg = error;
+            try {
+              var response = JSON.parse(xhr.responseText);
+              if (response.message) {
+                errorMsg = response.message;
+              }
+            } catch(e) {
+              // Si pas de JSON, utiliser responseText brut
+              errorMsg = xhr.responseText || error;
+            }
+            
+            alert('❌ Erreur : ' + errorMsg);
+
           },
           complete: function() {
             $('#facetag-save-xmp').prop('disabled', false).text('💾 Enregistrer');
@@ -381,7 +419,7 @@ error: function(xhr, status, error) {
       
 // Événement restaurer l'original
       $('#facetag-restore-original').click(function() {
-        if (!confirm('⚠️ ATTENTION ⚠️\n\nCette action va :\n• Supprimer tous les tags de visages actuels\n• Restaurer le fichier .original (sans tags)\n• Régénérer les miniatures\n\nÊtes-vous sûr de vouloir continuer ?')) {
+        if (!confirm('⚠️ ATTENTION ⚠️\n\nCette action va :\n• Restaurer le fichier .original \n• Régénérer les miniatures\n\nÊtes-vous sûr de vouloir continuer ?')) {
           return;
         }
         
@@ -404,7 +442,7 @@ error: function(xhr, status, error) {
             console.log('Réponse serveur:', data);
             
             if (data.stat === 'ok') {
-              alert('✅ Fichier original restauré avec succès !\n\nTous les tags de visages ont été supprimés.');
+              alert('✅ Fichier original restauré avec succès !');
               closeModal();
               window.location.href = window.location.href;
             } else {
@@ -412,7 +450,11 @@ error: function(xhr, status, error) {
             }
           },
           error: function(xhr, status, error) {
-            console.error('Erreur AJAX:', xhr.responseText);
+            console.error('458 ❌ ERREUR AJAX');
+            console.error('Status:', status);
+            console.error('Error:', error);
+            console.error('Response:', xhr.responseText);
+            console.error('Status Code:', xhr.status);
             
             try {
               var response = JSON.parse(xhr.responseText);
@@ -424,7 +466,7 @@ error: function(xhr, status, error) {
               }
             } catch(e) {}
             
-            var errorMsg = 'Erreur de connexion: ' + error;
+            var errorMsg = '427 - Erreur de connexion: ' + error;
             try {
               var response = JSON.parse(xhr.responseText);
               if (response.message) {
@@ -500,7 +542,7 @@ error: function(xhr, status, error) {
           }
         },
         error: function(xhr, status, error) {
-          console.error('❌ Erreur chargement XMP:', error);
+          console.error('551 ❌ Erreur chargement XMP:', error);
           console.error('Status:', status);
           console.error('Response:', xhr.responseText);
           callback([]);
@@ -955,21 +997,21 @@ canvas.on('object:modified', function(e) {
       $('body').append(nameModal);
       $('#facetag-name-input').focus();
       
-      $('#facetag-name-save').click(function() {
+     $('#facetag-name-save').click(function() {
+        console.log("=== CLIC SUR VALIDER (nom du visage) ===");
         var name = $('#facetag-name-input').val().trim();
+        console.log("Nom saisi:", name);
+        
         if (!name) {
+          console.log("⚠️ Nom vide - alerte affichée");
           alert('Veuillez entrer un nom');
           return;
         }
         
+        console.log("✅ Nom valide, ajout du label et sauvegarde...");
         addLabelToRect(rect, name);
         saveFaceData(rect, name);
-        closeNameModal();
-      });
-      
-      $('#facetag-name-cancel, #facetag-name-overlay').click(function() {
-        canvas.remove(rect);
-        canvas.renderAll();
+        console.log("✅ Visage créé avec succès");
         closeNameModal();
       });
       
@@ -1051,55 +1093,50 @@ canvas.on('object:modified', function(e) {
 }
     
     // ==================== LISTE DES VISAGES ====================
-    function updateFacesList() {
-      var $list = $('#facetag-faces-list');
-      var $count = $('#facetag-count');
-      
-      $count.text(faces.length);
-      $list.empty();
-      
-      if (faces.length === 0) {
-        $list.html('<p style="color:#999; text-align:center; padding:20px;">Aucun visage tagué</p>');
-        return;
-      }
-      
-      faces.forEach(function(face, index) {
-        var bgColor = face.existing ? '#e3f2fd' : '#fff';
-        var badge = face.existing ? '<span style="font-size:10px; background:#2196F3; color:white; padding:2px 6px; border-radius:3px; margin-left:5px;">existant</span>' : '';
-        
-        var $item = $('<div>')
-          .css({
-            padding: '10px',
-            margin: '5px 0',
-            background: bgColor,
-            border: '1px solid #444',
-            borderRadius: '4px',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center'
-          })
-          .html(`
-            <span style="color:#c41d1d;"><strong>${face.name}</strong>${badge}</span>
-            <button class="facetag-delete-face" data-index="${index}" style="padding:5px 12px; background:#ff4444; color:white; border:none; border-radius:3px; cursor:pointer; font-size:12px;">Supprimer</button>
-          `);
-        
-        $list.append($item);
-      });
-      
-      $('.facetag-delete-face').click(function() {
-        var index = $(this).data('index');
-        deleteFace(index);
-      });
-    }
+function updateFacesList() {
+  var $list = $('#facetag-faces-list');
+  var $count = $('#facetag-count');
+  
+  $count.text(faces.length);
+  $list.empty();
+  
+  if (faces.length === 0) {
+    $list.html('<p>Aucun visage tagué</p>');
+    return;
+  }
+  
+  faces.forEach(function(face, index) {
+    // Déterminer la classe et le badge selon si c'est un visage existant
+    var itemClass = face.existing ? 'face-item existing' : 'face-item';
+    var badge = face.existing ? '<span class="face-item-badge">existant</span>' : '';
     
-    function deleteFace(index) {
-      var face = faces[index];
-      canvas.remove(face.rect);
-      if (face.rect.label) canvas.remove(face.rect.label);
-      canvas.renderAll();
-      faces.splice(index, 1);
-      updateFacesList();
-    }
+    var $item = $('<div>')
+      .addClass(itemClass)
+      .html(`
+        <span class="face-item-name">${face.name}${badge}</span>
+        <button class="facetag-delete-face" data-index="${index}">Supprimer</button>
+      `);
+    
+    $list.append($item);
+  });
+  
+  // Event handler pour les boutons supprimer
+  //$list.off('click', '.facetag-delete-face'); // Nettoyer les anciens handlers
+  $list.on('click', '.facetag-delete-face', function() {
+    var index = $(this).data('index');
+    deleteFace(index);
+  });
+}
+
+
+function deleteFace(index) {
+  var face = faces[index];
+  canvas.remove(face.rect);
+  if (face.rect.label) canvas.remove(face.rect.label);
+  canvas.renderAll();
+  faces.splice(index, 1);
+  updateFacesList();
+}
     
     // ==================== FERMER LA MODAL ====================
     function closeModal() {

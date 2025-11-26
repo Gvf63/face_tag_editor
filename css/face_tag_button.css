@@ -1,0 +1,40 @@
+/* ============================================
+   Bouton "Taguer les visages"
+   face_tag_editor plugin
+   ============================================ */
+
+/* Icône SVG dans le bouton */
+#facetag-open-editor svg {
+  vertical-align: middle;
+  margin-right: 4px;
+}
+
+/* Pour les thèmes Bootstrap : adapter le contraste du texte */
+.btn#facetag-open-editor {
+  /* Le thème Bootstrap gère le fond, mais on force le texte blanc pour la lisibilité */
+  color: #fff !important;
+}
+
+.btn#facetag-open-editor:hover {
+  /* Assombrir au survol */
+  filter: brightness(0.9);
+}
+
+/* Pour le thème par défaut Piwigo uniquement */
+.pwg-button#facetag-open-editor {
+  background: #000;
+  color: #fff;
+  border: 1px solid #333;
+}
+
+.pwg-button#facetag-open-editor:hover {
+  background: #333;
+}
+
+.pwg-button#facetag-open-editor .pwg-icon {
+  color: inherit;
+}
+
+.pwg-button#facetag-open-editor .pwg-button-text {
+  color: inherit;
+}
