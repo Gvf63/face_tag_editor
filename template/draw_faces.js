@@ -7,7 +7,7 @@
   $(document).ready(function() {
     
     // Dans la console du navigateur
-    console.log($('link[href*="font-awesome"]').attr('href'));
+   // console.log($('link[href*="font-awesome"]').attr('href'));
     console.log('Face Tag Write: Script chargé )');
     
     var canvas = null;
@@ -69,13 +69,13 @@ case 6: // Rotate 90 CW
           newHeight = width;
           return {left: newLeft, top: newTop, width: newWidth, height: newHeight};
           
-        case 8: // Rotate 90 CCW (270 CW)
-          // Transformation : x' = 100 - y - height, y' = x
-          newLeft = 100 - top - height;
-          newTop = left;
-          newWidth = height;
-          newHeight = width;
-          return {left: newLeft, top: newTop, width: newWidth, height: newHeight};
+case 8: // Rotate 90 CCW (270 CW)
+  // Transformation : x' = 100 - y - height, y' = x
+  newLeft = 100 - top - height;
+  newTop = left;
+  newWidth = height;
+  newHeight = width;
+  return {left: newLeft, top: newTop, width: newWidth, height: newHeight};
           
         default:
           return {left: left, top: top, width: width, height: height};
@@ -126,14 +126,13 @@ case 6: // Rotate 90 CW - INVERSE
       newHeight = width;
       return {left: newLeft, top: newTop, width: newWidth, height: newHeight};
       
-    case 8: // Rotate 90 CCW (270 CW) - INVERSE
-      // Affichage: x' = y, y' = 100 - x - w
-      // Inverse: y = x', x = 100 - y' - h
-      newLeft = 100 - top - height;
-      newTop = left;
-      newWidth = height;
-      newHeight = width;
-      return {left: newLeft, top: newTop, width: newWidth, height: newHeight};
+ case 8: // Rotate 90 CCW (270 CW) - INVERSE
+  // Inverse: x = y', y = 100 - x' - w'
+  newLeft = top;
+  newTop = 100 - left - width;
+  newWidth = height;
+  newHeight = width;
+  return {left: newLeft, top: newTop, width: newWidth, height: newHeight};
       
     default:
       return {left: left, top: top, width: width, height: height};
@@ -189,6 +188,22 @@ case 6: // Rotate 90 CW - INVERSE
       console.log('Image URL:', imageSrc);
       console.log('Nom du fichier:', imageSrc.split('/').pop());
       console.log('Save URL:', saveUrl);
+
+    // Supprimer le log au début
+    $.ajax({
+    url: saveUrl.replace('saveXMP', 'clearLog'),
+    method: 'POST',
+    dataType: 'json',
+    success: function(response) {
+      console.log('Log supprimé');
+    },
+    error: function(xhr, status, error) {
+      console.log('Erreur suppression log (non bloquant):', error);
+    }
+    });
+
+
+
       
       // Charger Fabric.js puis ouvrir la modal
       loadFabricJS(function() {
@@ -292,25 +307,20 @@ $('#facetag-save-xmp').click(function() {
           };
         });
         
-        console.log('📦 Données à enregistrer:', facesData);
-        console.log('📄 JSON:', JSON.stringify(facesData));
+        //console.log('📦 Données à enregistrer:', facesData);
+        //console.log('📄 JSON:', JSON.stringify(facesData));
         console.log('🌐 URL:', saveUrl);
         
         $(this).prop('disabled', true).text('Enregistrement...');
-        console.log("🔒 Bouton désactivé");
+        //console.log("🔒 Bouton désactivé");
         
         // Créer un FormData pour envoyer en POST
         var formData = new FormData();
         formData.append('image_id', imageId);
         formData.append('faces', JSON.stringify(facesData));
         
-        console.log('=== DEBUG AJAX ===');
-        console.log('URL:', saveUrl);
-        console.log('FormData:', {
-          image_id: imageId,
-          faces: JSON.stringify(facesData)
-        });
-
+      //console.log('Faces JSON avant envoi:', JSON.stringify(facesData));
+      //console.log('Faces JSON bytes:', Array.from(JSON.stringify(facesData)).map(c => c.charCodeAt(0).toString(16).padStart(2, '0')).join(' '));
 
 $.ajax({
           url: saveUrl,
@@ -349,7 +359,7 @@ $.ajax({
 },
 
 error: function(xhr, status, error) {
-  console.error('358-❌ ERREUR AJAX');
+  console.error('346-❌ ERREUR AJAX');
             console.error('Status:', status);
             console.error('Error:', error);
             console.error('Response:', xhr.responseText);
@@ -370,7 +380,7 @@ error: function(xhr, status, error) {
 },
 
           error: function(xhr, status, error) {
-            console.error('379 ❌ ERREUR AJAX');
+            console.error('367 ❌ ERREUR AJAX');
             console.error('Status:', status);
             console.error('Error:', error);
             console.error('Response:', xhr.responseText);
@@ -450,7 +460,7 @@ error: function(xhr, status, error) {
             }
           },
           error: function(xhr, status, error) {
-            console.error('458 ❌ ERREUR AJAX');
+            console.error('447 ❌ ERREUR AJAX');
             console.error('Status:', status);
             console.error('Error:', error);
             console.error('Response:', xhr.responseText);
@@ -529,7 +539,7 @@ error: function(xhr, status, error) {
             xmpData.orientation = xmpContainer.orientation || 1;
             console.log('✓ Orientation EXIF:', xmpData.orientation);
             
-            console.log('✓ XMP chargé');
+            console.log('✓ XMP Orientation chargé');
             
             // Parser les visages
             existingFaces = parseFacesFromXMP(xmpData);
@@ -541,12 +551,32 @@ error: function(xhr, status, error) {
             callback([]);
           }
         },
+//-------------------------------------------------
         error: function(xhr, status, error) {
-          console.error('551 ❌ Erreur chargement XMP:', error);
-          console.error('Status:', status);
-          console.error('Response:', xhr.responseText);
-          callback([]);
-        }
+  console.error('551 ❌ Erreur chargement XMP:', error);
+  console.error('Status:', status);
+  console.error('Response:', xhr.responseText);
+  
+  // ⚠️ FALLBACK : créer un xmpData minimal
+  xmpData = {
+    orientation: 1,
+    _raw_xmp: '',
+    subjects: [],
+    hierarchical_subjects: [],
+    tags_list: [],
+    catalog_sets: [],
+    faces: [],
+    error: 'Erreur chargement XMP (HTTP ' + xhr.status + ')'
+  };
+  existingFaces = [];
+  
+  console.warn('⚠️ FALLBACK actif : orientation = 1 par défaut');
+  console.warn('⚠️ Les visages existants ne seront pas affichés');
+  
+  callback([]);
+}
+ //---------------------------------------------------       
+
       });
     }
     
@@ -704,7 +734,7 @@ error: function(xhr, status, error) {
 var mwgRegionList = xmlDoc.getElementsByTagName('mwg-rs:RegionList');
 
 if (mwgRegionList.length > 0) {
-  var descriptions = mwgRegionList[0].getElementsByTagName('rdf:Description');
+  var descriptions = mwgRegionList[0].getElementsByTagName('rdf:li');
   console.log('mwg-rs trouvé:', descriptions.length, 'visages');
   
   for (var i = 0; i < descriptions.length; i++) {
@@ -734,17 +764,19 @@ if (mwgRegionList.length > 0) {
         var h = area.getAttribute('stArea:h');
         
         // Si pas d'attributs, chercher les balises enfants (format 2)
-        if (!x) {
-          var xEl = area.getElementsByTagName('stArea:x')[0];
-          var yEl = area.getElementsByTagName('stArea:y')[0];
-          var wEl = area.getElementsByTagName('stArea:w')[0];
-          var hEl = area.getElementsByTagName('stArea:h')[0];
-          
-          if (xEl) x = xEl.textContent;
-          if (yEl) y = yEl.textContent;
-          if (wEl) w = wEl.textContent;
-          if (hEl) h = hEl.textContent;
-        }
+// Si pas d'attributs, chercher les balises enfants (format 2)
+if (!x) {
+  // Chercher avec ET sans namespace
+  var xEl = area.getElementsByTagName('stArea:x')[0] || area.getElementsByTagName('x')[0];
+  var yEl = area.getElementsByTagName('stArea:y')[0] || area.getElementsByTagName('y')[0];
+  var wEl = area.getElementsByTagName('stArea:w')[0] || area.getElementsByTagName('w')[0];
+  var hEl = area.getElementsByTagName('stArea:h')[0] || area.getElementsByTagName('h')[0];
+  
+  if (xEl) x = xEl.textContent || xEl.innerHTML;
+  if (yEl) y = yEl.textContent || yEl.innerHTML;
+  if (wEl) w = wEl.textContent || wEl.innerHTML;
+  if (hEl) h = hEl.textContent || hEl.innerHTML;
+}
         
         if (x && y && w && h) {
           // Éviter les doublons
@@ -1008,11 +1040,18 @@ canvas.on('object:modified', function(e) {
           return;
         }
         
-        console.log("✅ Nom valide, ajout du label et sauvegarde...");
-        addLabelToRect(rect, name);
-        saveFaceData(rect, name);
-        console.log("✅ Visage créé avec succès");
-        closeNameModal();
+console.log("✅ Nom valide, ajout du label et sauvegarde...");
+
+try {
+  addLabelToRect(rect, name);
+  saveFaceData(rect, name);
+  console.log("✅ Visage créé avec succès");
+} catch (error) {
+  console.error("❌ ERREUR lors de la sauvegarde du visage:", error);
+  alert("⚠️ Erreur technique : " + error.message + "\n\nLe rectangle a été créé mais les coordonnées n'ont peut-être pas été sauvegardées correctement.");
+}
+
+closeNameModal();
       });
       
       $('#facetag-name-input').keypress(function(e) {

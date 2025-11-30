@@ -73,11 +73,11 @@ class FaceTagMetadataMerger
     // Extraire les CatalogSets existants NON liés aux visages
     $non_face_catalogsets = $this->extractNonFaceCatalogSets($current);
     
-    error_log('Fusion - Non-face keywords: ' . count($non_face_keywords));
-    error_log('Fusion - Non-face subjects: ' . count($non_face_subjects));
-    error_log('Fusion - Non-face hierarchical: ' . count($non_face_hierarchical));
-    error_log('Fusion - Non-face tagslist: ' . count($non_face_tagslist));
-    error_log('Fusion - Non-face catalogsets: ' . count($non_face_catalogsets));
+    error_log('Préexistant - Non-face keywords: ' . count($non_face_keywords));
+    error_log('Préexistant - Non-face subjects: ' . count($non_face_subjects));
+    error_log('Préexistant - Non-face hierarchical: ' . count($non_face_hierarchical));
+    error_log('Préexistant - Non-face tagslist: ' . count($non_face_tagslist));
+    error_log('Préexistant - Non-face catalogsets: ' . count($non_face_catalogsets));
     
     // Fusionner
     return array(

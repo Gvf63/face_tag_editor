@@ -19,31 +19,8 @@ class FaceTagMetadataReader
         'xmp_raw' => ''
       );
       
-      // Lire proprietes
-      $properties = $imagick->getImageProperties();
       
-      foreach ($properties as $key => $value) {
-        if (strpos($key, 'exif:') === 0) {
-          $metadata['exif'][substr($key, 5)] = $value;
-        } elseif (strpos($key, 'iptc:') === 0) {
-          $field = substr($key, 5);
-          error_log('Reader - IPTC trouve: ' . $field . ' = ' . (is_array($value) ? print_r($value, true) : $value));
-          // IPTC peut avoir plusieurs valeurs
-          if (isset($metadata['iptc'][$field])) {
-            if (!is_array($metadata['iptc'][$field])) {
-              $metadata['iptc'][$field] = array($metadata['iptc'][$field]);
-            }
-            $metadata['iptc'][$field][] = $value;
-          } else {
-            $metadata['iptc'][$field] = $value;
-          }
-        }
-      }
-      
-      error_log('Reader - Total IPTC fields: ' . count($metadata['iptc']));
-      if (isset($metadata['iptc']['Keywords'])) {
-        error_log('Reader - IPTC Keywords trouve: ' . print_r($metadata['iptc']['Keywords'], true));
-      }
+
       
       // Lire XMP brut - AVEC GESTION D'ERREUR
       try {
@@ -55,7 +32,7 @@ class FaceTagMetadataReader
       
       if ($xmp_profile) {
         error_log('Reader - XMP brut trouve, longueur: ' . strlen($xmp_profile) . ' octets');
-        error_log('Reader - XMP preview: ' . substr($xmp_profile, 0, 800));
+        //error_log('Reader - XMP preview: ' . substr($xmp_profile, 0, 800)); // ------------------- affichage du xmp preview
         $metadata['xmp_raw'] = $xmp_profile;
         $metadata['xmp'] = $this->parseXmp($xmp_profile);
       } else {
@@ -105,6 +82,7 @@ class FaceTagMetadataReader
     $xpath->registerNamespace('lr', 'http://ns.adobe.com/lightroom/1.0/');
     $xpath->registerNamespace('digiKam', 'http://www.digikam.org/ns/1.0/');
     $xpath->registerNamespace('mwg-rs', 'http://www.metadataworkinggroup.com/schemas/regions/');
+    $xpath->registerNamespace('stArea', 'http://ns.adobe.com/xmp/sType/Area#');
     
     // dc:subject
     $subjects = $xpath->query('//dc:subject/rdf:Bag/rdf:li');
@@ -134,11 +112,42 @@ class FaceTagMetadataReader
       $data['catalog_sets'][] = $cat->nodeValue;
     }
     
-    // Faces (pour identifier keywords lies aux visages)
-    $xpath->registerNamespace('rdf', 'http://www.w3.org/1999/02/22-rdf-syntax-ns#');
-    $faceNames = $xpath->query('//mwg-rs:RegionList/rdf:Bag/rdf:li/mwg-rs:Name');
-    foreach ($faceNames as $name) {
-      $data['faces'][] = $name->nodeValue;
+    // Faces avec coordonnées complètes
+    $faceRegions = $xpath->query('//mwg-rs:RegionList/rdf:Bag/rdf:li');
+    error_log('parseXmp - Face regions trouvees: ' . $faceRegions->length);
+
+    foreach ($faceRegions as $region) {
+      // Vérifier que c'est bien un visage
+      $typeNodes = $xpath->query('mwg-rs:Type', $region);
+      $type = ($typeNodes->length > 0) ? $typeNodes->item(0)->nodeValue : '';
+      
+      if ($type !== 'Face') {
+        continue; // Ignorer les régions qui ne sont pas des visages
+      }
+      
+      // Lire le nom
+      $nameNodes = $xpath->query('mwg-rs:Name', $region);
+      $name = ($nameNodes->length > 0) ? $nameNodes->item(0)->nodeValue : '';
+      
+      // Lire les coordonnées de l'Area
+      $xNodes = $xpath->query('.//stArea:x', $region);
+      $yNodes = $xpath->query('.//stArea:y', $region);
+      $wNodes = $xpath->query('.//stArea:w', $region);
+      $hNodes = $xpath->query('.//stArea:h', $region);
+      
+      if ($xNodes->length > 0 && $yNodes->length > 0 && 
+          $wNodes->length > 0 && $hNodes->length > 0) {
+        
+        $data['faces'][] = array(
+          'name' => $name,
+          'x' => (float)$xNodes->item(0)->nodeValue,
+          'y' => (float)$yNodes->item(0)->nodeValue,
+          'w' => (float)$wNodes->item(0)->nodeValue,
+          'h' => (float)$hNodes->item(0)->nodeValue
+        );
+        
+        error_log("Face trouvee: $name at x=" . $xNodes->item(0)->nodeValue);
+      }
     }
 
     return $data;
@@ -153,7 +162,15 @@ class FaceTagMetadataReader
       $iptc_keywords = is_array($metadata['iptc']['Keywords']) ? 
         $metadata['iptc']['Keywords'] : array($metadata['iptc']['Keywords']);
       
-      $face_names = isset($metadata['xmp']['faces']) ? $metadata['xmp']['faces'] : array();
+      // Extraire juste les noms des faces
+      $face_names = array();
+      if (isset($metadata['xmp']['faces'])) {
+        foreach ($metadata['xmp']['faces'] as $face) {
+          if (is_array($face) && isset($face['name'])) {
+            $face_names[] = $face['name'];
+          }
+        }
+      }
       
       foreach ($iptc_keywords as $keyword) {
         if (!in_array($keyword, $face_names)) {
@@ -170,7 +187,15 @@ class FaceTagMetadataReader
     $non_face = array();
     
     if (isset($metadata['xmp']['subjects'])) {
-      $face_names = isset($metadata['xmp']['faces']) ? $metadata['xmp']['faces'] : array();
+      // Extraire juste les noms des faces
+      $face_names = array();
+      if (isset($metadata['xmp']['faces'])) {
+        foreach ($metadata['xmp']['faces'] as $face) {
+          if (is_array($face) && isset($face['name'])) {
+            $face_names[] = $face['name'];
+          }
+        }
+      }
       
       foreach ($metadata['xmp']['subjects'] as $subject) {
         if (!in_array($subject, $face_names)) {
