@@ -1,3 +1,55 @@
+remplacement 
+
+ // ========== MÉTHODE SIMPLE : LIRE VIA URL ==========
+  $url_base = get_absolute_root_url();
+  $url_picture = $row['path'];
+  $url_picture2 = substr($url_picture, 2); // enlève ./
+  //$url_original = $url_base . $url_picture2;
+// ✅ ENCODER chaque segment du chemin pour gérer les espaces et caractères spéciaux
+$path_parts = explode('/', $url_picture2);
+$encoded_parts = array_map('rawurlencode', $path_parts);
+$url_original = $url_base . implode('/', $encoded_parts) . '?t=' . time();
+
+  
+  error_log('=== GET XMP ===');
+  error_log('2 (349) URL originale -> ' . $url_original);
+  
+// Télécharger dans un fichier temporaire
+$temp_dir = PHPWG_ROOT_PATH . '_data/tmp';
+if (!is_dir($temp_dir)) {
+  mkdir($temp_dir, 0755, true);
+    if (!is_dir($temp_dir)) {
+    alert("Créer un repertoire tmp, ./_data/tmp avec des droits en écriture") ;}
+    }else{
+    error_log("3 - le rep ./_data/tmp existe");
+       
+}
+$temp_file = $temp_dir . '/facetag_write_' . uniqid() . '.jpg';
+  
+  //error_log('STEP2A: Attempting file_get_contents');
+  //error_log('STEP2A: temp_dir = ' . $temp_dir);
+  //error_log('STEP2A: temp_file = ' . $temp_file);
+  //error_log('STEP2A: temp_dir exists? ' . (is_dir($temp_dir) ? 'YES' : 'NO'));
+  //error_log('STEP2A: temp_dir writable? ' . (is_writable($temp_dir) ? 'YES' : 'NO'));
+  
+  $image_content = @file_get_contents($url_original);
+  if ($image_content === false) {
+    error_log('ERROR: file_get_contents FAILED');
+    $last_error = error_get_last();
+    if ($last_error) {
+      error_log('ERROR: PHP error = ' . $last_error['message']);
+    }
+    error_reporting($old_error_reporting);
+    ini_set('display_errors', $old_display_errors);
+    return new PwgError(500, 'Cannot download image from URL');
+  }
+  
+  //error_log('STEP2B: file_get_contents SUCCESS, size = ' . strlen($image_content) . ' bytes');
+  
+  @file_put_contents($temp_file, $image_content);
+
+
+
 code supprimé du metadata_reader
 
 // Lire proprietes

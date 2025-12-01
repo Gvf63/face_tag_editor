@@ -93,8 +93,8 @@ function face_tag_write_restore_original($params, &$service)
     error_log('⚠️ Impossible de supprimer le fichier .original');
   }
   
-  // Régénérer les miniatures
-  face_tag_write_regenerate_derivatives($params['image_id']);
+  // Régénérer les métadonnéess
+  face_tag_write_regenerate_metadata($params['image_id']);
   
   error_reporting($old_error_reporting);
   ini_set('display_errors', $old_display_errors);

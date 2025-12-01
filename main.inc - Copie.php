@@ -1,21 +1,16 @@
 <?php
 /*
 Plugin Name: face_tag_editor
-Version: 1.5
+Version: 1.4C
 Description: Créer et enregistrer les tags de visages dans les métadonnées XMP (mode modal) - Version simplifiée avec URLs
-Plugin URI: https://fr.piwigo.org/ext/index.php?eid=1053
+Plugin URI: https://fr.piwigo.org/ext/
 Author: Charles69
 Has Settings: webmaster
 */
 
 //============= VERSIONS ============================================
 /*
-
-version 1.5 - 01/12/2025
-    contourné le problème allow_url_fopen
-    bug sur restaurer l'original <- 1.4C (pas 1.4A)
-
-version 1.4C - 30/11/2025 test
+version 1.4C - en cours
     pb valider qui ne fonctionne pas -> contournement
     régénération des miniatures = non nécessaire & ne fonctionne pas
     la régénération des miniatures est automatique par piwigo
@@ -361,50 +356,47 @@ $url_original = $url_base . implode('/', $encoded_parts) . '?t=' . time();
 
   
   error_log('=== GET XMP ===');
+  error_log('2 (349) URL originale -> ' . $url_original);
   
-  // ========== ACCÈS DIRECT AU FICHIER LOCAL ==========
-  // Résoudre le chemin (gère les liens symboliques)
-  $real_local_path = face_tag_write_resolve_path($row['path']);
-  
-  if ($real_local_path === false || !file_exists($real_local_path)) {
-    error_log('ERROR: File not found');
-    error_reporting($old_error_reporting);
-    ini_set('display_errors', $old_display_errors);
-    return new PwgError(404, 'Image file not found');
-  }
-  
-  error_log('Local path: ' . $real_local_path);
-  
-  // Créer le répertoire temporaire
-  $temp_dir = PHPWG_ROOT_PATH . '_data/tmp';
-  if (!is_dir($temp_dir)) {
-    mkdir($temp_dir, 0755, true);
+// Télécharger dans un fichier temporaire
+$temp_dir = PHPWG_ROOT_PATH . '_data/tmp';
+if (!is_dir($temp_dir)) {
+  mkdir($temp_dir, 0755, true);
     if (!is_dir($temp_dir)) {
-      error_log("ERROR: Cannot create temp directory");
-      error_reporting($old_error_reporting);
-      ini_set('display_errors', $old_display_errors);
-      return new PwgError(500, 'Cannot create temp directory');
+    alert("Créer un repertoire tmp, ./_data/tmp avec des droits en écriture") ;}
+    }else{
+    error_log("3 - le rep ./_data/tmp existe");
+       
+}
+$temp_file = $temp_dir . '/facetag_write_' . uniqid() . '.jpg';
+  
+  //error_log('STEP2A: Attempting file_get_contents');
+  //error_log('STEP2A: temp_dir = ' . $temp_dir);
+  //error_log('STEP2A: temp_file = ' . $temp_file);
+  //error_log('STEP2A: temp_dir exists? ' . (is_dir($temp_dir) ? 'YES' : 'NO'));
+  //error_log('STEP2A: temp_dir writable? ' . (is_writable($temp_dir) ? 'YES' : 'NO'));
+  
+  $image_content = @file_get_contents($url_original);
+  if ($image_content === false) {
+    error_log('ERROR: file_get_contents FAILED');
+    $last_error = error_get_last();
+    if ($last_error) {
+      error_log('ERROR: PHP error = ' . $last_error['message']);
     }
-  }
-  
-  error_log("Temp directory exists: " . $temp_dir);
-  
-  $temp_file = $temp_dir . '/facetag_read_' . uniqid() . '.jpg';
-  
-  // Copier le fichier local (pas de téléchargement HTTP)
-  if (!@copy($real_local_path, $temp_file)) {
-    error_log('ERROR: Cannot copy file');
     error_reporting($old_error_reporting);
     ini_set('display_errors', $old_display_errors);
-    return new PwgError(500, 'Cannot copy image file');
+    return new PwgError(500, 'Cannot download image from URL');
   }
   
-  error_log('STEP2: File copied: ' . filesize($temp_file) . ' bytes');
+  //error_log('STEP2B: file_get_contents SUCCESS, size = ' . strlen($image_content) . ' bytes');
+  
+  @file_put_contents($temp_file, $image_content);
+  //error_log('STEP3: Temp file size = ' . filesize($temp_file) . ' octets');
+  error_log('Temp file size = ' . filesize($temp_file) . ' octets');
 
   if (!extension_loaded('imagick'))
   {
     error_log('>>>> ERROR: PHPImagick not loaded'); 
-    //alert("PHP Imagick est requis - PHP Imagick is required");
     @unlink($temp_file);
     error_reporting($old_error_reporting);
     ini_set('display_errors', $old_display_errors);
@@ -573,42 +565,50 @@ function face_tag_write_save_xmp($params, &$service)
     return new PwgError(404, 'Image not found');
   }
   
-  // ========== ACCÈS DIRECT AU FICHIER LOCAL ==========
-  // Même méthode que dans get_xmp
-  $real_local_path = face_tag_write_resolve_path($row['path']);
+  // Construire l'URL pour télécharger
+  $url_base = get_absolute_root_url();
+  $url_picture = $row['path'];
+  $url_picture2 = substr($url_picture, 2); // enlève ./
+  //$url_original = $url_base . $url_picture2;
+
+  // ✅ ENCODER chaque segment du chemin
+$path_parts = explode('/', $url_picture2);
+$encoded_parts = array_map('rawurlencode', $path_parts);
+$url_original = $url_base . implode('/', $encoded_parts) . '?t=' . time();
   
-  if ($real_local_path === false || !file_exists($real_local_path)) {
-    error_log('SAVE-ERROR: File not found');
-    error_reporting($old_error_reporting);
-    ini_set('display_errors', $old_display_errors);
-    return new PwgError(404, 'Image file not found');
-  }
+  error_log('URL: ' . $url_original);
   
-  error_log('SAVE: Local path: ' . $real_local_path);
-  
-  // Créer le répertoire temporaire
-  $temp_dir = PHPWG_ROOT_PATH . '_data/tmp';
+// Télécharger dans un fichier temporaire
+$temp_dir = PHPWG_ROOT_PATH . '_data/tmp';
+if (!is_dir($temp_dir)) {
+  mkdir($temp_dir, 0755, true);
   if (!is_dir($temp_dir)) {
-    mkdir($temp_dir, 0755, true);
-    if (!is_dir($temp_dir)) {
-      error_log('SAVE-ERROR: Cannot create temp directory');
-      error_reporting($old_error_reporting);
-      ini_set('display_errors', $old_display_errors);
-      return new PwgError(500, 'Cannot create temp directory');
+    alert("Créer un repertoire tmp, ./_data/tmp avec des droits en écriture") ;}
+}
+$temp_file = $temp_dir . '/facetag_read_' . uniqid() . '.jpg';
+  
+  //error_log('SAVE-STEP2A: Attempting file_get_contents');
+  //error_log('SAVE-STEP2A: temp_dir = ' . $temp_dir);
+  //error_log('SAVE-STEP2A: temp_file = ' . $temp_file);
+  //error_log('SAVE-STEP2A: temp_dir exists? ' . (is_dir($temp_dir) ? 'YES' : 'NO'));
+  //error_log('SAVE-STEP2A: temp_dir writable? ' . (is_writable($temp_dir) ? 'YES' : 'NO'));
+  
+  $image_content = @file_get_contents($url_original);
+  if ($image_content === false) {
+    error_log('SAVE-ERROR: file_get_contents FAILED');
+    $last_error = error_get_last();
+    if ($last_error) {
+      error_log('SAVE-ERROR: PHP error = ' . $last_error['message']);
     }
-  }
-  
-  $temp_file = $temp_dir . '/facetag_read_' . uniqid() . '.jpg';
-  
-  // Copier le fichier local
-  if (!@copy($real_local_path, $temp_file)) {
-    error_log('SAVE-ERROR: Cannot copy file');
     error_reporting($old_error_reporting);
     ini_set('display_errors', $old_display_errors);
-    return new PwgError(500, 'Cannot copy image file');
+    return new PwgError(500, 'Cannot download image from URL');
   }
   
-  error_log('SAVE-STEP2: File copied: ' . filesize($temp_file) . ' bytes');
+  error_log('SAVE-STEP2B: file_get_contents SUCCESS, size = ' . strlen($image_content) . ' bytes');
+  
+  @file_put_contents($temp_file, $image_content);
+  error_log('SAVE-STEP3: Temp file size = ' . filesize($temp_file) . ' octets');
   
 // Construire le chemin local et le résoudre (gère les liens symboliques)
   $real_local_path = face_tag_write_resolve_path($row['path']);
