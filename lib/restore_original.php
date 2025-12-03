@@ -93,8 +93,22 @@ function face_tag_write_restore_original($params, &$service)
     error_log('⚠️ Impossible de supprimer le fichier .original');
   }
   
-  // Régénérer les métadonnéess
-  face_tag_write_regenerate_metadata($params['image_id']);
+  // Synchroniser les métadonnées avec Piwigo
+  try {
+    if (!function_exists('sync_metadata')) {
+      include_once(PHPWG_ROOT_PATH . 'admin/include/functions.php');
+      include_once(PHPWG_ROOT_PATH . 'admin/include/functions_metadata.php');
+    }
+
+    if (function_exists('sync_metadata')) {
+      sync_metadata(array($params['image_id']));
+      error_log('✓ Métadonnées Piwigo synchronisées après restauration');
+    } else {
+      error_log('⚠ Fonction sync_metadata non disponible');
+    }
+  } catch (Exception $e) {
+    error_log('⚠ Erreur synchronisation après restauration: ' . $e->getMessage());
+  }
   
   error_reporting($old_error_reporting);
   ini_set('display_errors', $old_display_errors);

@@ -178,11 +178,10 @@ case 6: // Rotate 90 CW - INVERSE
       imageId = $(this).data('image-id');
       imageSrc = $(this).data('image-src');
       saveUrl = $(this).data('save-url');
-      imageSrc = $(this).data('image-src');
-      saveUrl = $(this).data('save-url');
-      hasOriginal = $(this).data('has-original');
-      
-      console.log('Has original:', hasOriginal);
+      // Lire hasOriginal depuis le bouton du DOM à CHAQUE fois
+      hasOriginal = $(this).data('has-original') === 'true' || $(this).data('has-original') === true;
+
+      console.log('Image ID:', imageId, '- Has original:', hasOriginal);
       
       console.log('Image ID:', imageId);
       console.log('Image URL:', imageSrc);
@@ -271,8 +270,13 @@ var modalHtml = `
       $('body').append(modalHtml);
 
             // Afficher le bouton "Restaurer" seulement si un fichier .original existe
-      if (hasOriginal) {
+      console.log('Vérification hasOriginal:', hasOriginal);
+      if (hasOriginal === true || hasOriginal === 'true') {
+        console.log('Affichage du bouton restaurer');
         $('#facetag-restore-original').show();
+      } else {
+        console.log('Masquage du bouton restaurer');
+        $('#facetag-restore-original').hide();
       }
       
       // Charger l'image et initialiser le canvas
@@ -450,41 +454,59 @@ error: function(xhr, status, error) {
           dataType: 'json',
           success: function(data) {
             console.log('Réponse serveur:', data);
-            
-            if (data.stat === 'ok') {
+
+            // Vérifier la structure de réponse Piwigo
+            var result = data.result || data;
+
+            if (data.stat === 'ok' || result.stat === 'ok') {
               alert('✅ Fichier original restauré avec succès !');
               closeModal();
-              window.location.href = window.location.href;
+              // Recharger la page pour mettre à jour l'état du bouton restaurer
+              setTimeout(function() {
+                window.location.href = window.location.href;
+              }, 500);
             } else {
-              alert('Erreur: ' + (data.message || 'Erreur inconnue'));
+              alert('Erreur: ' + (data.message || result.message || 'Erreur inconnue'));
             }
           },
           error: function(xhr, status, error) {
-            console.error('447 ❌ ERREUR AJAX');
+            console.error('❌ ERREUR AJAX');
             console.error('Status:', status);
             console.error('Error:', error);
             console.error('Response:', xhr.responseText);
             console.error('Status Code:', xhr.status);
-            
+
+            // Vérifier si c'est une fausse erreur (succès en réalité)
             try {
               var response = JSON.parse(xhr.responseText);
               if (response.stat === 'ok') {
-                alert('✅ Restauré (malgré erreur HTTP)');
+                alert('✅ Fichier original restauré avec succès !');
                 closeModal();
-                location.reload();
+                setTimeout(function() {
+                  location.reload();
+                }, 500);
                 return;
               }
             } catch(e) {}
-            
-            var errorMsg = '427 - Erreur de connexion: ' + error;
+
+            var errorMsg = error || 'Erreur inconnue';
             try {
               var response = JSON.parse(xhr.responseText);
               if (response.message) {
                 errorMsg = response.message;
+              } else if (response.faultString) {
+                errorMsg = response.faultString;
               }
             } catch(e) {}
-            
-            alert('❌ ' + errorMsg);
+
+            // Afficher le message d'erreur spécifique
+            if (xhr.status === 404) {
+              alert('❌ Aucun fichier .original trouvé à restaurer.\n\nLe fichier original n\'existe que si vous avez déjà enregistré des tags.');
+            } else if (xhr.status === 403) {
+              alert('❌ Accès refusé. Vous n\'avez pas les permissions nécessaires.');
+            } else {
+              alert('❌ Erreur : ' + errorMsg);
+            }
           },
           complete: function() {
             $('#facetag-restore-original').prop('disabled', false).text('⏮️ Restaurer l\'original');
@@ -970,43 +992,65 @@ if (!x) {
       // Mettre à jour les données quand on modifie un rectangle existant
 canvas.on('object:modified', function(e) {
   var obj = e.target;
-  
+
   var faceIndex = faces.findIndex(f => f.rect === obj);
-  
+
   if (faceIndex !== -1) {
     var x = obj.left / canvas.displayWidth;
     var y = obj.top / canvas.displayHeight;
     var w = (obj.width * obj.scaleX) / canvas.displayWidth;
     var h = (obj.height * obj.scaleY) / canvas.displayHeight;
-    
+
     var centerX = x + (w / 2);
     var centerY = y + (h / 2);
-    
+
     // ✅ Appliquer transformation inverse SEULEMENT si orientation ≠ 1
     var orientation = xmpData.orientation || 1;
-    
+
     if (orientation !== 1) {
       var leftPct = centerX * 100 - (w * 100 / 2);
       var topPct = centerY * 100 - (h * 100 / 2);
       var widthPct = w * 100;
       var heightPct = h * 100;
-      
+
       var original = inverseTransformCoordinates(leftPct, topPct, widthPct, heightPct, orientation);
-      
+
       centerX = (original.left + original.width / 2) / 100;
       centerY = (original.top + original.height / 2) / 100;
       w = original.width / 100;
       h = original.height / 100;
     }
-    
+
     faces[faceIndex].x = centerX;
     faces[faceIndex].y = centerY;
     faces[faceIndex].w = w;
     faces[faceIndex].h = h;
-    
+
     console.log('Rectangle modifié, nouvelles coordonnées:', faces[faceIndex]);
   }
 });
+
+      // ==================== DOUBLE-CLIC POUR RENOMMER ====================
+      var lastClickTime = 0;
+      var lastClickedObject = null;
+
+      canvas.on('mouse:down', function(options) {
+        var now = Date.now();
+        var timeDiff = now - lastClickTime;
+
+        // Vérifier si c'est un double-clic (< 300ms) sur le même objet
+        if (options.target && timeDiff < 300 && lastClickedObject === options.target) {
+          console.log('=== DOUBLE-CLIC DÉTECTÉ ===');
+          var faceIndex = faces.findIndex(f => f.rect === options.target);
+          if (faceIndex !== -1) {
+            promptForRename(faceIndex);
+          }
+          lastClickTime = 0; // Réinitialiser pour éviter triple-clic
+        } else {
+          lastClickTime = now;
+          lastClickedObject = options.target;
+        }
+      });
     }
     
     // ==================== DIALOGUE POUR NOMMER ====================
@@ -1054,6 +1098,12 @@ try {
 closeNameModal();
       });
       
+      $('#facetag-name-cancel').click(function() {
+        console.log("=== CLIC SUR ANNULER ===");
+        canvas.remove(rect);
+        closeNameModal();
+      });
+
       $('#facetag-name-input').keypress(function(e) {
         if (e.which === 13) $('#facetag-name-save').click();
       });
@@ -1063,7 +1113,76 @@ closeNameModal();
       $('#facetag-name-modal, #facetag-name-overlay').remove();
       currentRect = null;
     }
-    
+
+    // ==================== DIALOGUE POUR RENOMMER UN VISAGE EXISTANT ====================
+    function promptForRename(faceIndex) {
+      var face = faces[faceIndex];
+      var existingNames = faces.map(f => f.name).filter((v, i, a) => a.indexOf(v) === i);
+
+      var renameModal = `
+        <div id="facetag-rename-modal" style="position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:white; padding:30px; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,0.3); z-index:10001; min-width:400px;">
+          <h3 style="margin-top:0;">Renommer la personne</h3>
+          <p style="color:#666; font-size:13px;">Ancien nom : <strong>${face.name}</strong></p>
+          <input type="text" id="facetag-rename-input" placeholder="Nouveau nom" value="${face.name}" style="width:100%; padding:10px; margin:15px 0; font-size:16px; border:2px solid #ddd; border-radius:4px;">
+          ${existingNames.length > 0 ? '<div style="margin-top:10px; color:#666; font-size:13px;">Autres personnes : ' + existingNames.filter(n => n !== face.name).join(', ') + '</div>' : ''}
+          <div style="text-align:right; margin-top:20px;">
+            <button id="facetag-rename-cancel" style="padding:10px 20px; margin-right:10px; background:#ccc; border:none; border-radius:4px; cursor:pointer;">Annuler</button>
+            <button id="facetag-rename-save" style="padding:10px 20px; background:#4CAF50; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Renommer</button>
+          </div>
+        </div>
+        <div id="facetag-rename-overlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10000;"></div>
+      `;
+
+      $('body').append(renameModal);
+      $('#facetag-rename-input').focus().select();
+
+      $('#facetag-rename-save').click(function() {
+        console.log("=== CLIC SUR RENOMMER ===");
+        var newName = $('#facetag-rename-input').val().trim();
+        console.log("Ancien nom:", face.name, "Nouveau nom:", newName);
+
+        if (!newName) {
+          console.log("⚠️ Nom vide - alerte affichée");
+          alert('Veuillez entrer un nom');
+          return;
+        }
+
+        if (newName === face.name) {
+          console.log("ℹ️ Nom identique, pas de changement");
+          closeRenameModal();
+          return;
+        }
+
+        // Mettre à jour le nom du visage
+        faces[faceIndex].name = newName;
+
+        // Mettre à jour le label sur le canvas
+        if (face.rect.label) {
+          canvas.remove(face.rect.label);
+        }
+        addLabelToRect(face.rect, newName);
+
+        // Mettre à jour la liste des visages
+        updateFacesList();
+
+        console.log("✅ Visage renommé avec succès");
+        closeRenameModal();
+      });
+
+      $('#facetag-rename-cancel').click(function() {
+        console.log("=== CLIC SUR ANNULER (renommage) ===");
+        closeRenameModal();
+      });
+
+      $('#facetag-rename-input').keypress(function(e) {
+        if (e.which === 13) $('#facetag-rename-save').click();
+      });
+    }
+
+    function closeRenameModal() {
+      $('#facetag-rename-modal, #facetag-rename-overlay').remove();
+    }
+
     // ==================== LABEL SUR LE RECTANGLE ====================
     function addLabelToRect(rect, name) {
       var label = new fabric.Text(name, {

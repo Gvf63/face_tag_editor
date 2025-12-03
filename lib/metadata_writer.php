@@ -38,14 +38,15 @@ class FaceTagMetadataWriterSimple
    */
   public function writeMetadata($image_path, $faces, $merged_data = null)
   {
-    if (!extension_loaded('imagick')) {
-      return array('success' => false, 'error' => 'Imagick not loaded');
-    }
-    
     try {
       error_log('=== WRITER SIMPLE : Début ===');
-      
-      $imagick = new Imagick($image_path);
+
+      // Use wrapper for fallback support
+      $imagick = ImagickWrapper::load($image_path);
+
+      if ($imagick->hasError()) {
+        return array('success' => false, 'error' => $imagick->getError());
+      }
       
       // Récupérer dimensions
       $image_width = $imagick->getImageWidth();

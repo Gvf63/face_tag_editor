@@ -1,21 +1,16 @@
 <?php
 /*
 Plugin Name: face_tag_editor
-Version: 1.5
+Version: 1.4C
 Description: Créer et enregistrer les tags de visages dans les métadonnées XMP (mode modal) - Version simplifiée avec URLs
-Plugin URI: https://fr.piwigo.org/ext/index.php?eid=1053
+Plugin URI: https://fr.piwigo.org/ext/
 Author: Charles69
 Has Settings: webmaster
 */
 
 //============= VERSIONS ============================================
 /*
-
-version 1.5 - 01/12/2025
-    contourné le problème allow_url_fopen
-    bug sur restaurer l'original <- 1.4C (pas 1.4A)
-
-version 1.4C - 30/11/2025 test
+version 1.4C - en cours
     pb valider qui ne fonctionne pas -> contournement
     régénération des miniatures = non nécessaire & ne fonctionne pas
     la régénération des miniatures est automatique par piwigo
@@ -92,6 +87,7 @@ ini_set('log_errors', 1);
 ini_set('error_log', './plugins/face_tag_editor/face_tag_editor_debug.log');
 
   // Charger les classes
+require_once(FACETAGWRITE_PATH . 'lib/imagick_wrapper.php');
 require_once(FACETAGWRITE_PATH . 'lib/metadata_writer.php');
 require_once(FACETAGWRITE_PATH . 'lib/metadata_merger.php');
 require_once(FACETAGWRITE_PATH . 'lib/file_resolver.php');
@@ -349,80 +345,79 @@ function face_tag_write_get_xmp($params, &$service)
     return new PwgError(404, 'Image not found');
   }
   
-  // ========== MÉTHODE SIMPLE : LIRE VIA URL ==========
-  $url_base = get_absolute_root_url();
-  $url_picture = $row['path'];
-  $url_picture2 = substr($url_picture, 2); // enlève ./
-  //$url_original = $url_base . $url_picture2;
-// ✅ ENCODER chaque segment du chemin pour gérer les espaces et caractères spéciaux
-$path_parts = explode('/', $url_picture2);
-$encoded_parts = array_map('rawurlencode', $path_parts);
-$url_original = $url_base . implode('/', $encoded_parts) . '?t=' . time();
-
-  
-  error_log('=== GET XMP ===');
-  
-  // ========== ACCÈS DIRECT AU FICHIER LOCAL ==========
-  // Résoudre le chemin (gère les liens symboliques)
+  // ========== MÉTHODE DIRECTE : LIRE VIA CHEMIN LOCAL (sans allow_url_fopen) ==========
   $real_local_path = face_tag_write_resolve_path($row['path']);
-  
-  if ($real_local_path === false || !file_exists($real_local_path)) {
-    error_log('ERROR: File not found');
+
+  if ($real_local_path === false) {
+    error_log('❌ Impossible de résoudre le chemin du fichier');
     error_reporting($old_error_reporting);
     ini_set('display_errors', $old_display_errors);
-    return new PwgError(404, 'Image file not found');
+    return new PwgError(500, 'Cannot resolve file path');
   }
-  
-  error_log('Local path: ' . $real_local_path);
-  
-  // Créer le répertoire temporaire
+
+  if (!file_exists($real_local_path)) {
+    error_log('❌ Le fichier n\'existe pas: ' . $real_local_path);
+    error_reporting($old_error_reporting);
+    ini_set('display_errors', $old_display_errors);
+    return new PwgError(404, 'File not found at resolved path');
+  }
+
+  error_log('=== GET XMP ===');
+  error_log('2 (349) Fichier local -> ' . $real_local_path);
+
+  // Créer un fichier temporaire
   $temp_dir = PHPWG_ROOT_PATH . '_data/tmp';
   if (!is_dir($temp_dir)) {
     mkdir($temp_dir, 0755, true);
     if (!is_dir($temp_dir)) {
-      error_log("ERROR: Cannot create temp directory");
-      error_reporting($old_error_reporting);
-      ini_set('display_errors', $old_display_errors);
-      return new PwgError(500, 'Cannot create temp directory');
+      alert("Créer un repertoire tmp, ./_data/tmp avec des droits en écriture");
     }
+  } else {
+    error_log("3 - le rep ./_data/tmp existe");
   }
-  
-  error_log("Temp directory exists: " . $temp_dir);
-  
-  $temp_file = $temp_dir . '/facetag_read_' . uniqid() . '.jpg';
-  
-  // Copier le fichier local (pas de téléchargement HTTP)
-  if (!@copy($real_local_path, $temp_file)) {
-    error_log('ERROR: Cannot copy file');
+  $temp_file = $temp_dir . '/facetag_write_' . uniqid() . '.jpg';
+
+  // Lire le fichier local directement (pas de allow_url_fopen nécessaire)
+  $image_content = @file_get_contents($real_local_path);
+  if ($image_content === false) {
+    error_log('ERROR: file_get_contents du fichier local FAILED');
+    $last_error = error_get_last();
+    if ($last_error) {
+      error_log('ERROR: PHP error = ' . $last_error['message']);
+    }
     error_reporting($old_error_reporting);
     ini_set('display_errors', $old_display_errors);
-    return new PwgError(500, 'Cannot copy image file');
+    return new PwgError(500, 'Cannot read image file');
   }
-  
-  error_log('STEP2: File copied: ' . filesize($temp_file) . ' bytes');
 
-  if (!extension_loaded('imagick'))
-  {
-    error_log('>>>> ERROR: PHPImagick not loaded'); 
-    //alert("PHP Imagick est requis - PHP Imagick is required");
+  error_log('STEP2B: file_get_contents SUCCESS, size = ' . strlen($image_content) . ' bytes');
+
+  @file_put_contents($temp_file, $image_content);
+  //error_log('STEP3: Temp file size = ' . filesize($temp_file) . ' octets');
+  error_log('Temp file size = ' . filesize($temp_file) . ' octets');
+
+  // Try to extract XMP using wrapper (with fallback to external ImageMagick)
+  if (function_exists('facetag_extract_xmp')) {
+    //error_log('STEP4: Using facetag_extract_xmp');
+    $xmp_data = facetag_extract_xmp($temp_file);
+  } else {
+    error_log('STEP4: Using face_tag_write_extract_xmp');
+    $xmp_data = face_tag_write_extract_xmp($temp_file);
+  }
+
+  // Check if extraction had an error
+  if (isset($xmp_data['error'])) {
+    error_log('ERROR: XMP extraction failed - ' . $xmp_data['error']);
     @unlink($temp_file);
     error_reporting($old_error_reporting);
     ini_set('display_errors', $old_display_errors);
     return array(
       'stat' => 'ok',
       'result' => array(
-        'xmp' => array('_raw_xmp' => '', 'error' => 'Imagick not loaded'),
+        'xmp' => array('_raw_xmp' => '', 'error' => $xmp_data['error']),
         'orientation' => 1
       )
     );
-  }
-  
-  if (function_exists('facetag_extract_xmp')) {
-    //error_log('STEP4: Using facetag_extract_xmp');
-    $xmp_data = facetag_extract_xmp($temp_file);
-  } else {
-    error_log('STEP4: Using face_tag_write_extract_xmp'); 
-    $xmp_data = face_tag_write_extract_xmp($temp_file);
   }
   
   // Récupérer l'orientation EXIF
@@ -461,22 +456,23 @@ $url_original = $url_base . implode('/', $encoded_parts) . '?t=' . time();
 // ==================== FONCTION D'EXTRACTION XMP ====================
 function face_tag_write_extract_xmp($image_path)
 {
-  if (!extension_loaded('imagick'))
-  {
-    return array('error' => 'Imagick extension not loaded');
-  }
-  
   try
   {
-    $imagick = new Imagick($image_path);
-    
+    // Use wrapper for fallback support
+    $imagick = ImagickWrapper::load($image_path);
+
+    if ($imagick->hasError())
+    {
+      return array('error' => $imagick->getError());
+    }
+
     $properties = $imagick->getImageProperties();
-    
+
     $xmp_data = array();
-    
+
     foreach ($properties as $key => $value)
     {
-      if (strpos($key, 'xmp:') === 0 || 
+      if (strpos($key, 'xmp:') === 0 ||
           strpos($key, 'dc:') === 0 ||
           strpos($key, 'Iptc4xmpCore:') === 0 ||
           strpos($key, 'mwg-rs:') === 0 ||
@@ -485,16 +481,16 @@ function face_tag_write_extract_xmp($image_path)
         $xmp_data[$key] = $value;
       }
     }
-    
+
     $xmp_profile = $imagick->getImageProfile('xmp');
     if ($xmp_profile)
     {
       $xmp_data['_raw_xmp'] = $xmp_profile;
     }
-    
+
     $imagick->clear();
     $imagick->destroy();
-    
+
     return $xmp_data;
   }
   catch (Exception $e)
@@ -573,78 +569,68 @@ function face_tag_write_save_xmp($params, &$service)
     return new PwgError(404, 'Image not found');
   }
   
-  // ========== ACCÈS DIRECT AU FICHIER LOCAL ==========
-  // Même méthode que dans get_xmp
+  // Construire le chemin local et le résoudre (gère les liens symboliques)
   $real_local_path = face_tag_write_resolve_path($row['path']);
-  
-  if ($real_local_path === false || !file_exists($real_local_path)) {
-    error_log('SAVE-ERROR: File not found');
-    error_reporting($old_error_reporting);
-    ini_set('display_errors', $old_display_errors);
-    return new PwgError(404, 'Image file not found');
-  }
-  
-  error_log('SAVE: Local path: ' . $real_local_path);
-  
-  // Créer le répertoire temporaire
-  $temp_dir = PHPWG_ROOT_PATH . '_data/tmp';
-  if (!is_dir($temp_dir)) {
-    mkdir($temp_dir, 0755, true);
-    if (!is_dir($temp_dir)) {
-      error_log('SAVE-ERROR: Cannot create temp directory');
-      error_reporting($old_error_reporting);
-      ini_set('display_errors', $old_display_errors);
-      return new PwgError(500, 'Cannot create temp directory');
-    }
-  }
-  
-  $temp_file = $temp_dir . '/facetag_read_' . uniqid() . '.jpg';
-  
-  // Copier le fichier local
-  if (!@copy($real_local_path, $temp_file)) {
-    error_log('SAVE-ERROR: Cannot copy file');
-    error_reporting($old_error_reporting);
-    ini_set('display_errors', $old_display_errors);
-    return new PwgError(500, 'Cannot copy image file');
-  }
-  
-  error_log('SAVE-STEP2: File copied: ' . filesize($temp_file) . ' bytes');
-  
-// Construire le chemin local et le résoudre (gère les liens symboliques)
-  $real_local_path = face_tag_write_resolve_path($row['path']);
-  
+
+  error_log('Fichier local: ' . $real_local_path);
+
   if ($real_local_path === false) {
     error_log('❌ Impossible de résoudre le chemin du fichier');
-    @unlink($temp_file);
     error_reporting($old_error_reporting);
     ini_set('display_errors', $old_display_errors);
     return new PwgError(500, 'Cannot resolve file path');
   }
-  
+
   error_log('Chemin local résolu: ' . $real_local_path);
-  
+
   // Vérifier que le fichier existe et est accessible
   if (!file_exists($real_local_path)) {
     error_log('❌ Le fichier n\'existe pas: ' . $real_local_path);
-    @unlink($temp_file);
     error_reporting($old_error_reporting);
     ini_set('display_errors', $old_display_errors);
     return new PwgError(404, 'File not found at resolved path');
   }
-  
+
   // Vérifier les permissions en lecture
   if (!is_readable($real_local_path)) {
     error_log('❌ Le fichier n\'est pas lisible');
-    @unlink($temp_file);
     error_reporting($old_error_reporting);
     ini_set('display_errors', $old_display_errors);
     return new PwgError(403, 'File is not readable');
   }
-  
-  // Créer backup
+
+  // Créer un répertoire temporaire si nécessaire
+  $temp_dir = PHPWG_ROOT_PATH . '_data/tmp';
+  if (!is_dir($temp_dir)) {
+    mkdir($temp_dir, 0755, true);
+    if (!is_dir($temp_dir)) {
+      error_log('⚠️ Impossible de créer le répertoire temporaire');
+      error_reporting($old_error_reporting);
+      ini_set('display_errors', $old_display_errors);
+      return new PwgError(500, 'Cannot create temporary directory');
+    }
+  }
+
   // Créer un fichier temporaire pour lire les métadonnées originales
+  $temp_file = $temp_dir . '/facetag_write_' . uniqid() . '.jpg';
   $temp_for_reading = $temp_dir . '/facetag_read_' . uniqid() . '.jpg';
-  @file_put_contents($temp_for_reading, $image_content);
+
+  // Copier le fichier original vers le fichier temporaire (pour écriture)
+  if (!@copy($real_local_path, $temp_file)) {
+    error_log('❌ Impossible de copier le fichier vers le fichier temporaire');
+    error_reporting($old_error_reporting);
+    ini_set('display_errors', $old_display_errors);
+    return new PwgError(500, 'Cannot copy file to temporary location');
+  }
+
+  // Copier aussi pour lecture des métadonnées
+  if (!@copy($real_local_path, $temp_for_reading)) {
+    error_log('❌ Impossible de copier le fichier pour la lecture des métadonnées');
+    @unlink($temp_file);
+    error_reporting($old_error_reporting);
+    ini_set('display_errors', $old_display_errors);
+    return new PwgError(500, 'Cannot copy file for metadata reading');
+  }
   
   error_log('Fichier pour lecture métadonnées: ' . $temp_for_reading);
   

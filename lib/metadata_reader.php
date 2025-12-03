@@ -5,12 +5,14 @@ class FaceTagMetadataReader
 {
   public function readAll($image_path)
   {
-    if (!extension_loaded('imagick')) {
-      return array('error' => 'Imagick not loaded');
+    // Use wrapper for fallback support
+    $imagick = ImagickWrapper::load($image_path);
+
+    if ($imagick->hasError()) {
+      return array('error' => $imagick->getError());
     }
-    
+
     try {
-      $imagick = new Imagick($image_path);
       
       $metadata = array(
         'exif' => array(),
