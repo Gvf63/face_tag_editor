@@ -1,5 +1,5 @@
 // face_tag_write - Interface modale de dessin des visages
-// Version 2.1 - Support rotation EXIF
+
 
 (function($) {
   'use strict';
@@ -8,7 +8,7 @@
     
     // Dans la console du navigateur
    // console.log($('link[href*="font-awesome"]').attr('href'));
-    console.log('Face Tag Write: Script chargé )');
+    console.log('Face Tag Editor: Script chargé )');
     
     var canvas = null;
     var currentRect = null;
@@ -25,6 +25,7 @@
     // ==================== FONCTION DE TRANSFORMATION DES COORDONNÉES (EXIF) ====================
     // Fonction pour transformer les coordonnées selon l'orientation EXIF
     // Valeurs possibles : 1-8 (voir spec EXIF)
+    
     function transformCoordinates(left, top, width, height, orientation) {
       var newLeft, newTop, newWidth, newHeight;
       
@@ -53,13 +54,13 @@
           newHeight = width;
           return {left: newLeft, top: newTop, width: newWidth, height: newHeight};
           
-case 6: // Rotate 90 CW
-  // Pour afficher correctement après rotation
-  newLeft = 100 - top - height;
-  newTop = left;
-  newWidth = height;
-  newHeight = width;
-  return {left: newLeft, top: newTop, width: newWidth, height: newHeight};
+        case 6: // Rotate 90 CW
+          // Pour afficher correctement après rotation
+          newLeft = 100 - top - height;
+          newTop = left;
+          newWidth = height;
+          newHeight = width;
+          return {left: newLeft, top: newTop, width: newWidth, height: newHeight};
           
         case 7: // Rotate 90 CCW + Flip horizontal
           // Transformation : x' = y, y' = 100 - x - width
@@ -69,22 +70,23 @@ case 6: // Rotate 90 CW
           newHeight = width;
           return {left: newLeft, top: newTop, width: newWidth, height: newHeight};
           
-case 8: // Rotate 90 CCW (270 CW)
-  // Transformation : x' = 100 - y - height, y' = x
-  newLeft = 100 - top - height;
-  newTop = left;
-  newWidth = height;
-  newHeight = width;
-  return {left: newLeft, top: newTop, width: newWidth, height: newHeight};
+        case 8: // Rotate 90 CCW (270 CW)
+          // Transformation : x' = 100 - y - height, y' = x
+          newLeft = 100 - top - height;
+          newTop = left;
+          newWidth = height;
+          newHeight = width;
+          return {left: newLeft, top: newTop, width: newWidth, height: newHeight};
           
         default:
           return {left: left, top: top, width: width, height: height};
       }
     }
+
     //---------------------------------------------------------------------------
 
     // Fonction inverse : canvas → coordonnées originales selon orientation EXIF
-function inverseTransformCoordinates(left, top, width, height, orientation) {
+  function inverseTransformCoordinates(left, top, width, height, orientation) {
   var newLeft, newTop, newWidth, newHeight;
   
   switch(orientation) {
@@ -111,13 +113,13 @@ function inverseTransformCoordinates(left, top, width, height, orientation) {
       newHeight = width;
       return {left: newLeft, top: newTop, width: newWidth, height: newHeight};
       
-case 6: // Rotate 90 CW - INVERSE
-  // Inverse: x_orig = y_ecran, y_orig = 100 - x_ecran - w_ecran
-  newLeft = top;
-  newTop = 100 - left - width;
-  newWidth = height;
-  newHeight = width;
-  return {left: newLeft, top: newTop, width: newWidth, height: newHeight};
+    case 6: // Rotate 90 CW - INVERSE
+      // Inverse: x_orig = y_ecran, y_orig = 100 - x_ecran - w_ecran
+      newLeft = top;
+      newTop = 100 - left - width;
+      newWidth = height;
+      newHeight = width;
+      return {left: newLeft, top: newTop, width: newWidth, height: newHeight};
       
     case 7: // Rotate 90 CCW + Flip horizontal
       newLeft = 100 - top - height;
@@ -126,22 +128,18 @@ case 6: // Rotate 90 CW - INVERSE
       newHeight = width;
       return {left: newLeft, top: newTop, width: newWidth, height: newHeight};
       
- case 8: // Rotate 90 CCW (270 CW) - INVERSE
-  // Inverse: x = y', y = 100 - x' - w'
-  newLeft = top;
-  newTop = 100 - left - width;
-  newWidth = height;
-  newHeight = width;
-  return {left: newLeft, top: newTop, width: newWidth, height: newHeight};
+    case 8: // Rotate 90 CCW (270 CW) - INVERSE
+      // Inverse: x = y', y = 100 - x' - w'
+      newLeft = top;
+      newTop = 100 - left - width;
+      newWidth = height;
+      newHeight = width;
+      return {left: newLeft, top: newTop, width: newWidth, height: newHeight};
       
     default:
       return {left: left, top: top, width: width, height: height};
   }
 }
-
-
-
-
 
 
     // ==================== CHARGER FABRIC.JS À LA DEMANDE ====================
@@ -169,7 +167,7 @@ case 6: // Rotate 90 CW - INVERSE
       document.head.appendChild(script);
     }
     
-    // ==================== OUVERTURE DE LA MODAL ====================
+    // ==================== OUVERTURE DE LA MODAL ======================================================
     $(document).on('click', '#facetag-open-editor', function(e) {
       e.preventDefault();
       
@@ -181,13 +179,13 @@ case 6: // Rotate 90 CW - INVERSE
       // Lire hasOriginal depuis le bouton du DOM à CHAQUE fois
       hasOriginal = $(this).data('has-original') === 'true' || $(this).data('has-original') === true;
 
-      console.log('Image ID:', imageId, '- Has original:', hasOriginal);
-      
+      console.log('Image ID:', imageId, '- Has a backup original:', hasOriginal);
       console.log('Image ID:', imageId);
       console.log('Image URL:', imageSrc);
       console.log('Nom du fichier:', imageSrc.split('/').pop());
       console.log('Save URL:', saveUrl);
 
+    //---------------------------------------------------------------------------
     // Supprimer le log au début
     $.ajax({
     url: saveUrl.replace('saveXMP', 'clearLog'),
@@ -200,10 +198,7 @@ case 6: // Rotate 90 CW - INVERSE
       console.log('Erreur suppression log (non bloquant):', error);
     }
     });
-
-
-
-      
+    //----------------------------------------------------------------------------
       // Charger Fabric.js puis ouvrir la modal
       loadFabricJS(function() {
         //console.log('Fabric.js prêt, ouverture de la modale');
@@ -211,7 +206,7 @@ case 6: // Rotate 90 CW - INVERSE
       });
     });
     
-    // ==================== CRÉER LA MODAL ====================
+    // ==================== CRÉER LA MODAL ============================================================
     function openModal() {
       // Supprimer les modales existantes
       $('#facetag-modal, #facetag-modal-overlay').remove();
@@ -229,7 +224,7 @@ var modalHtml = `
     
     <!-- Instructions -->
     <div class="modal-instructions">
-      <p><strong>Instructions :</strong> Cliquez et faites glisser sur l'image pour dessiner un rectangle autour d'un visage.</p>
+      <p><strong>Instructions :</strong> Cliquez et faites glisser sur l'image pour dessiner un rectangle autour d'un visage. Double-cliquez sur un cadre pour renommer un visage</p>
     </div>
     
     <!-- Contenu principal -->
@@ -269,7 +264,8 @@ var modalHtml = `
       
       $('body').append(modalHtml);
 
-            // Afficher le bouton "Restaurer" seulement si un fichier .original existe
+      //-------------------------------------------------------------------------------------------------
+      // Afficher le bouton "Restaurer" seulement si un fichier .original existe
       console.log('Vérification hasOriginal:', hasOriginal);
       if (hasOriginal === true || hasOriginal === 'true') {
         console.log('Affichage du bouton restaurer');
@@ -285,8 +281,9 @@ var modalHtml = `
       // Événements de fermeture
       $('#facetag-close-modal, #facetag-cancel').click(closeModal);
       
+      //-----------------------------------------------------------------------------------------
       // Événement d'enregistrement
-$('#facetag-save-xmp').click(function() {
+      $('#facetag-save-xmp').click(function() {
         console.log("=== CLIC SUR ENREGISTRER ===");
         console.log("Image ID:", imageId);
         console.log("Nombre de visages:", faces.length);
@@ -311,7 +308,7 @@ $('#facetag-save-xmp').click(function() {
           };
         });
         
-        //console.log('📦 Données à enregistrer:', facesData);
+        console.log('📦 Données à enregistrer:', facesData);
         //console.log('📄 JSON:', JSON.stringify(facesData));
         console.log('🌐 URL:', saveUrl);
         
@@ -350,12 +347,10 @@ $.ajax({
     
     alert(msg);
     closeModal();
-    
+
     // FORCER RAFRAÎCHISSEMENT COMPLET
     window.location.href = window.location.href;
     
-
-
 
   } else {
     alert('Erreur: ' + (data.message || result.message || 'Erreur inconnue'));
@@ -363,7 +358,7 @@ $.ajax({
 },
 
 error: function(xhr, status, error) {
-  console.error('346-❌ ERREUR AJAX');
+  console.error('361-❌ ERREUR AJAX');
             console.error('Status:', status);
             console.error('Error:', error);
             console.error('Response:', xhr.responseText);
@@ -380,11 +375,11 @@ error: function(xhr, status, error) {
     }
   } catch(e) {}
   
- // alert('348 - Erreur de connexion: ' + error);
+ // alert('378 - Erreur de connexion: ' + error);
 },
 
           error: function(xhr, status, error) {
-            console.error('367 ❌ ERREUR AJAX');
+            console.error('382 ❌ ERREUR AJAX');
             console.error('Status:', status);
             console.error('Error:', error);
             console.error('Response:', xhr.responseText);
@@ -409,8 +404,8 @@ error: function(xhr, status, error) {
           }
         });
       });
-      
-      // Événement effacer tout
+  //----------------------------------------------------------------------------------------------   
+  // Événement effacer tout
       $('#facetag-clear-all').click(function() {
         if (faces.length === 0) {
           alert('Aucun visage à effacer');
@@ -430,7 +425,7 @@ error: function(xhr, status, error) {
         faces = [];
         updateFacesList();
       });
-      
+//-----------------------------------------------------------------------------------------------------      
 // Événement restaurer l'original
       $('#facetag-restore-original').click(function() {
         if (!confirm('⚠️ ATTENTION ⚠️\n\nCette action va :\n• Restaurer le fichier .original \n• Régénérer les miniatures\n\nÊtes-vous sûr de vouloir continuer ?')) {
@@ -514,16 +509,14 @@ error: function(xhr, status, error) {
         });
       });
 
-
-
-
       // Touche Escape
       $(document).on('keyup.facetag', function(e) {
         if (e.keyCode === 27) closeModal();
       });
     }
+
     
-    // ==================== CHARGER LES XMP (comme face_tag) ====================
+    // ==================== CHARGER LES XMP (comme face_tag) ===========================================================
     function loadXmpData(callback) {
       console.log('Chargement des XMP...');
       
@@ -557,7 +550,7 @@ error: function(xhr, status, error) {
           if (data.stat === 'ok' && xmpContainer && xmpContainer.xmp) {
             xmpData = xmpContainer.xmp;
             
-            // ==================== NOUVEAU : STOCKER L'ORIENTATION ====================
+            // ====================  STOCKER L'ORIENTATION =======================================================
             xmpData.orientation = xmpContainer.orientation || 1;
             console.log('✓ Orientation EXIF:', xmpData.orientation);
             
@@ -573,6 +566,7 @@ error: function(xhr, status, error) {
             callback([]);
           }
         },
+
 //-------------------------------------------------
         error: function(xhr, status, error) {
   console.error('551 ❌ Erreur chargement XMP:', error);
@@ -671,7 +665,8 @@ error: function(xhr, status, error) {
       img.src = imageSrc;
     }
     
-    // ==================== PARSER LES XMP (copié de face_tag) ====================
+    // ==================== PARSER LES XMP (copié de face_tag) ========================================
+
     function parseFacesFromXMP(data) {
       var faces = [];
       
@@ -752,7 +747,8 @@ error: function(xhr, status, error) {
         }
       }
       
-// === FORMAT 2 : mwg-rs (Metadata Working Group) ===
+// === FORMAT 2 : mwg-rs (Metadata Working Group) ==================================================
+
 var mwgRegionList = xmlDoc.getElementsByTagName('mwg-rs:RegionList');
 
 if (mwgRegionList.length > 0) {
@@ -786,21 +782,22 @@ if (mwgRegionList.length > 0) {
         var h = area.getAttribute('stArea:h');
         
         // Si pas d'attributs, chercher les balises enfants (format 2)
-// Si pas d'attributs, chercher les balises enfants (format 2)
-if (!x) {
-  // Chercher avec ET sans namespace
-  var xEl = area.getElementsByTagName('stArea:x')[0] || area.getElementsByTagName('x')[0];
-  var yEl = area.getElementsByTagName('stArea:y')[0] || area.getElementsByTagName('y')[0];
-  var wEl = area.getElementsByTagName('stArea:w')[0] || area.getElementsByTagName('w')[0];
-  var hEl = area.getElementsByTagName('stArea:h')[0] || area.getElementsByTagName('h')[0];
-  
-  if (xEl) x = xEl.textContent || xEl.innerHTML;
-  if (yEl) y = yEl.textContent || yEl.innerHTML;
-  if (wEl) w = wEl.textContent || wEl.innerHTML;
-  if (hEl) h = hEl.textContent || hEl.innerHTML;
-}
+
+      if (!x) {
+      // Chercher avec ET sans namespace
+      var xEl = area.getElementsByTagName('stArea:x')[0] || area.getElementsByTagName('x')[0];
+      var yEl = area.getElementsByTagName('stArea:y')[0] || area.getElementsByTagName('y')[0];
+      var wEl = area.getElementsByTagName('stArea:w')[0] || area.getElementsByTagName('w')[0];
+      var hEl = area.getElementsByTagName('stArea:h')[0] || area.getElementsByTagName('h')[0];
+      
+      if (xEl) x = xEl.textContent || xEl.innerHTML;
+      if (yEl) y = yEl.textContent || yEl.innerHTML;
+      if (wEl) w = wEl.textContent || wEl.innerHTML;
+      if (hEl) h = hEl.textContent || hEl.innerHTML;
+      }
         
-        if (x && y && w && h) {
+      
+      if (x && y && w && h) {
           // Éviter les doublons
           var alreadyExists = faces.some(function(f) {
             return f.name === name;
@@ -827,7 +824,7 @@ if (!x) {
       return faces;
     }
     
-    // ==================== AFFICHER UN VISAGE EXISTANT ====================
+    // ==================== AFFICHER UN VISAGE EXISTANT ======================================================
     function displayExistingFace(face) {
       // Convertir les coordonnées normalisées -> pixels canvas
       // mwg-rs : x,y = centre
@@ -839,7 +836,7 @@ if (!x) {
       var left = centerX - (width / 2);
       var top = centerY - (height / 2);
       
-      // ==================== NOUVEAU : APPLIQUER LA TRANSFORMATION EXIF ====================
+      // ==================== APPLIQUER LA TRANSFORMATION EXIF ====================
       var orientation = xmpData.orientation || 1;
       console.log('Orientation pour affichage:', orientation);
       
@@ -892,7 +889,7 @@ if (!x) {
       });
     }
     
-    // ==================== MODE DESSIN ====================
+    // ==================== MODE DESSIN =================================================================
     function setupDrawingMode() {
       var isDrawing = false;
       var startX, startY;
@@ -1250,7 +1247,7 @@ closeNameModal();
   updateFacesList();
 }
     
-    // ==================== LISTE DES VISAGES ====================
+    // ==================== LISTE DES VISAGES ==========================================================
 function updateFacesList() {
   var $list = $('#facetag-faces-list');
   var $count = $('#facetag-count');
@@ -1296,7 +1293,7 @@ function deleteFace(index) {
   updateFacesList();
 }
     
-    // ==================== FERMER LA MODAL ====================
+    // ==================== FERMER LA MODAL =========================================================
     function closeModal() {
       $('#facetag-modal, #facetag-modal-overlay').remove();
       $(document).off('keyup.facetag');

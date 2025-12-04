@@ -1,16 +1,29 @@
 <?php
 /*
 Plugin Name: face_tag_editor
-Version: 1.4C
-Description: Créer et enregistrer les tags de visages dans les métadonnées XMP (mode modal) - Version simplifiée avec URLs
-Plugin URI: https://fr.piwigo.org/ext/
+Version: 1.6
+Description: Créer et enregistrer les tags de visages dans les métadonnées XMP (mode modal) 
+Plugin URI: https://fr.piwigo.org/ext/index.php?eid=1053
 Author: Charles69
 Has Settings: webmaster
 */
 
 //============= VERSIONS ============================================
 /*
-version 1.4C - en cours
+
+version 1.6 - 04/12/2025 
+    à voir : 270 CW
+    External Imagick & PHP IMagick
+    corrigé : saisie nom annule
+    corrigé : restauration fichier
+    ajouté  : modification nom  
+    bug enregistrement original
+
+version 1.5 - 01/12/2025 diffusée
+    contourné le problème allow_url_fopen
+    bug sur restaurer l'original <- 1.4C (pas 1.4A)
+
+version 1.4C - 30/11/2025
     pb valider qui ne fonctionne pas -> contournement
     régénération des miniatures = non nécessaire & ne fonctionne pas
     la régénération des miniatures est automatique par piwigo
@@ -133,7 +146,7 @@ function face_tag_write_load_css()
   ');
 }
 
-// ==================== CHARGER NOTRE SCRIPT ====================
+// ==================== CHARGER SCRIPT ====================
 add_event_handler('loc_end_page_tail', 'face_tag_write_load_scripts');
 function face_tag_write_load_scripts()
 {
@@ -190,7 +203,7 @@ function face_tag_write_check_access()
   return false;
 }
 
-
+//---------------------------------------------------------------------------
 function face_tag_write_add_button()
 {
   global $template, $picture, $user;
@@ -200,7 +213,6 @@ function face_tag_write_add_button()
   {
     return;
   }
-
  
   $query = '
   SELECT path, file
@@ -216,7 +228,7 @@ function face_tag_write_add_button()
   $image_url = embellish_url(get_root_url() . $original_path);
   $save_url = get_root_url() . 'ws.php?format=json&method=facetagwrite.saveXMP';
   
-// Vérifier si le fichier .original existe
+// Vérifier si le fichier de backup .original existe
   $real_local_path = face_tag_write_resolve_path($row['path']);
   $has_original = file_exists($real_local_path . '.original') ? 'true' : 'false';
 
@@ -318,11 +330,11 @@ function face_tag_write_get_xmp($params, &$service)
 
   error_log('**** DEBUT LOG ****');
   
-  error_log('1 (304) Image ID -> ' . $params['image_id']);
+  error_log('1 (333) Image ID -> ' . $params['image_id']);
   
   if (empty($params['image_id']))
   {
-    error_log('ERROR (314) : Missing image_id');
+    error_log('ERROR (337) : Missing image_id');
     error_reporting($old_error_reporting);
     ini_set('display_errors', $old_display_errors);
     return new PwgError(WS_ERR_INVALID_PARAM, 'Missing image_id');
@@ -363,7 +375,7 @@ function face_tag_write_get_xmp($params, &$service)
   }
 
   error_log('=== GET XMP ===');
-  error_log('2 (349) Fichier local -> ' . $real_local_path);
+  error_log('2 (378) Fichier local -> ' . $real_local_path);
 
   // Créer un fichier temporaire
   $temp_dir = PHPWG_ROOT_PATH . '_data/tmp';
@@ -693,14 +705,24 @@ function face_tag_write_save_xmp($params, &$service)
     if (@copy($temp_file, $real_local_path)) {
       error_log('Fichier copié vers: ' . $real_local_path);
       @chmod($real_local_path, 0644);
+      // Forcer le vidage du cache PHP et système
+      clearstatcache(true, $real_local_path);
+      // Mettre à jour la date de modification pour forcer le rechargement
+      @touch($real_local_path);
+      error_log('Cache vidé et date de modification mise à jour');
     } else {
       error_log('Échec copie - Dernière tentative: écriture directe');
-      
+
       // Dernière tentative : lire le temp et écrire directement
       $content = file_get_contents($temp_file);
       if (@file_put_contents($real_local_path, $content) !== false) {
         error_log('Écriture directe réussie');
         @chmod($real_local_path, 0644);
+        // Forcer le vidage du cache PHP et système
+        clearstatcache(true, $real_local_path);
+        // Mettre à jour la date de modification pour forcer le rechargement
+        @touch($real_local_path);
+        error_log('Cache vidé et date de modification mise à jour');
       } else {
         error_log('Toutes les méthodes ont échoué');
         @unlink($temp_file);
@@ -709,7 +731,7 @@ function face_tag_write_save_xmp($params, &$service)
         return new PwgError(500, 'Cannot write to file - check permissions on: ' . $real_local_path);
       }
     }
-    
+
     // Nettoyer le fichier temporaire
     @unlink($temp_file);
     
@@ -747,10 +769,7 @@ function face_tag_write_save_xmp($params, &$service)
 function face_tag_write_regenerate_metadata($image_id)
 {
   
-  
-  
-  // ==================== SYNCHRONISATION DES MÉTADONNÉES PIWIGO ====================
-  // Charger TOUS les fichiers nécessaires
+  // Charge les fichiers nécessaires
   if (!function_exists('sync_metadata')) {
     include_once(PHPWG_ROOT_PATH . 'admin/include/functions_metadata.php');
   }
@@ -769,6 +788,7 @@ function face_tag_write_regenerate_metadata($image_id)
  return true;
 }
 
+//-------------------------------------------------------------------------------
 /// Effacement du fichier de log quand on clique sur taguer
 
 function face_tag_write_clear_log($params, &$service)
@@ -784,7 +804,7 @@ function face_tag_write_clear_log($params, &$service)
     @unlink($log_file);
   }
   
-  error_log('=== NOUVEAU TRAITEMENT - LOG SUPPRIMÉ ===');
+  error_log('=== NOUVEAU TRAITEMENT  ===');
   
   return array('stat' => 'ok', 'message' => 'Log cleared');
 }

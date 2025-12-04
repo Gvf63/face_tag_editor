@@ -109,20 +109,18 @@ class FaceTagMetadataMerger
   private function extractNonFaceHierarchical($metadata)
   {
     $non_face = array();
-
+    
     if (isset($metadata['xmp']['hierarchical_subjects'])) {
-      // Extraire les NOMS des visages (pas les objets)
+      // ✅ CORRECTION: Extraire les NOMS des visages (pas les objets complets)
       $face_names = array();
       if (isset($metadata['xmp']['faces'])) {
         foreach ($metadata['xmp']['faces'] as $face) {
           if (is_array($face) && isset($face['name'])) {
             $face_names[] = $face['name'];
-          } elseif (is_string($face)) {
-            $face_names[] = $face;
           }
         }
       }
-
+      
       foreach ($metadata['xmp']['hierarchical_subjects'] as $hier) {
         // Vérifier si c'est un tag de personne (format: Personnes|NomPersonne ou |Personnes|NomPersonne)
         $is_person_tag = false;
@@ -132,33 +130,31 @@ class FaceTagMetadataMerger
             break;
           }
         }
-
+        
         if (!$is_person_tag) {
           $non_face[] = $hier;
         }
       }
     }
-
+    
     return array_unique($non_face);
   }
   
   private function extractNonFaceTagsList($metadata)
   {
     $non_face = array();
-
+    
     if (isset($metadata['xmp']['tags_list'])) {
-      // Extraire les NOMS des visages (pas les objets)
+      // ✅ CORRECTION: Extraire les NOMS des visages (pas les objets complets)
       $face_names = array();
       if (isset($metadata['xmp']['faces'])) {
         foreach ($metadata['xmp']['faces'] as $face) {
           if (is_array($face) && isset($face['name'])) {
             $face_names[] = $face['name'];
-          } elseif (is_string($face)) {
-            $face_names[] = $face;
           }
         }
       }
-
+      
       foreach ($metadata['xmp']['tags_list'] as $tag) {
         // Vérifier si c'est un tag de personne (format: Personnes/NomPersonne)
         $is_person_tag = false;
@@ -168,33 +164,31 @@ class FaceTagMetadataMerger
             break;
           }
         }
-
+        
         if (!$is_person_tag) {
           $non_face[] = $tag;
         }
       }
     }
-
+    
     return array_unique($non_face);
   }
   
   private function extractNonFaceCatalogSets($metadata)
   {
     $non_face = array();
-
+    
     if (isset($metadata['xmp']['catalog_sets'])) {
-      // Extraire les NOMS des visages (pas les objets)
+      // ✅ CORRECTION: Extraire les NOMS des visages (pas les objets complets)
       $face_names = array();
       if (isset($metadata['xmp']['faces'])) {
         foreach ($metadata['xmp']['faces'] as $face) {
           if (is_array($face) && isset($face['name'])) {
             $face_names[] = $face['name'];
-          } elseif (is_string($face)) {
-            $face_names[] = $face;
           }
         }
       }
-
+      
       foreach ($metadata['xmp']['catalog_sets'] as $cat) {
         // Vérifier si c'est un tag de personne (format: Personnes|NomPersonne)
         $is_person_tag = false;
@@ -204,13 +198,13 @@ class FaceTagMetadataMerger
             break;
           }
         }
-
+        
         if (!$is_person_tag) {
           $non_face[] = $cat;
         }
       }
     }
-
+    
     return array_unique($non_face);
   }
   
