@@ -73,27 +73,123 @@ class FaceTagMetadataWriterSimple
       // Générer le XMP à partir du template
       $xmp = $this->buildXmpFromTemplate($faces, $image_width, $image_height, $all_subjects, $all_hierarchical, $all_tagslist, $all_catalogsets);
       
-      
-//$xmp = xmp_formatter($xmp);
-//error_log('*** XMP Compact ***');
-//error_log( "<pre>" . htmlspecialchars($xmp) . "</pre>");
-//error_log( $xmp); //----------------------------------
-//error_log('*** fin XMP Compact ***');
-
-
       // Injecter le XMP
       $imagick->setImageProfile('xmp', $xmp);
       
-      // Écrire IPTC Keywords
-      if ($this->config['write_fields']['iptc_keywords'] && count($all_subjects) > 0) {
-        $this->writeIptcProfile($imagick, $all_subjects);
+      // ========== ÉCRITURE IPTC : DÉTECTION INTELLIGENTE ==========
+      // Détecter le cas problématique : segment Photoshop APP13 vide
+      // (créé par Affinity Photo, Lightroom sur images vierges)
+      $has_empty_photoshop = false;
+      $has_iptc = false;
+      
+      try {
+        $existing_iptc = $imagick->getImageProfile('iptc');
+        $has_iptc = ($existing_iptc && strlen($existing_iptc) > 0);
+        
+        // Si pas d'IPTC, vérifier si segment Photoshop vide existe
+        if (!$has_iptc) {
+          // Lire le profil 8BIM (Photoshop)
+          try {
+            $photoshop_profile = $imagick->getImageProfile('8BIM');
+            if ($photoshop_profile && strlen($photoshop_profile) > 0) {
+              // Segment Photoshop existe mais pas d'IPTC = cas problématique
+              $has_empty_photoshop = true;
+              error_log('⚠ Segment Photoshop vide détecté (Affinity/Lightroom) - Imagick ne peut pas injecter IPTC');
+            }
+          } catch (Exception $e) {
+            // Pas de profil Photoshop = OK, Imagick peut créer
+          }
+        }
+        
+        error_log('IPTC existant: ' . ($has_iptc ? 'OUI (' . strlen($existing_iptc) . ' bytes)' : 'NON'));
+        error_log('Photoshop vide: ' . ($has_empty_photoshop ? 'OUI (bug Imagick)' : 'NON'));
+      } catch (Exception $e) {
+        error_log('Pas d\'IPTC existant');
+        $has_iptc = false;
       }
       
-      // Sauvegarder
-      $imagick->writeImage($image_path);
+      if ($this->config['write_fields']['iptc_keywords'] && count($all_subjects) > 0) {
+        if ($has_iptc) {
+          // Image avec IPTC existant → Imagick fonctionne bien
+          error_log('✓ Utilisation de la méthode Imagick (IPTC existant)');
+          $this->writeIptcProfile($imagick, $all_subjects);
+        } elseif ($has_empty_photoshop) {
+          // Segment Photoshop vide → Le supprimer pour permettre à Imagick de créer l'IPTC
+          error_log('⚠ Segment Photoshop vide détecté (Affinity/Lightroom)');
+          
+          try {
+            $result = $imagick->removeImageProfile('8BIM');
+            
+            if ($result === false) {
+              throw new Exception('removeImageProfile returned false');
+            }
+            
+            error_log('✓ Segment Photoshop vide supprimé');
+            error_log('✓ Imagick peut maintenant créer l\'IPTC');
+            $this->writeIptcProfile($imagick, $all_subjects);
+          } catch (Exception $e) {
+            error_log('❌ Impossible de supprimer le segment Photoshop: ' . $e->getMessage());
+            error_log('⚠ Fallback exiftool nécessaire');
+            // Fallback exiftool si la suppression échoue
+            $imagick->writeImage($image_path);
+            $imagick->clear();
+            $imagick->destroy();
+            $exiftool_result = $this->writeIptcWithExiftool($image_path, $all_subjects);
+            
+            if (!$exiftool_result) {
+              error_log('❌ AVERTISSEMENT : exiftool non disponible - IPTC Keywords non écrits !');
+              return array(
+                'success' => true, 
+                'warning' => 'IPTC Keywords non écrits (exiftool manquant). Cette image a été créée par un logiciel d\'édition (Affinity Photo, Lightroom) et nécessite exiftool. XMP OK mais synchronisation Piwigo non garantie.'
+              );
+            }
+            
+            error_log('=== WRITER SIMPLE : Succès (via exiftool fallback) ===');
+            return array('success' => true);
+          }
+        } else {
+          // Pas d'IPTC, pas de Photoshop → Image brute appareil photo
+          // MAIS : External ImageMagick ne peut pas créer l'IPTC correctement !
+          
+          // Vérifier si on utilise External ImageMagick
+          $using_external = false;
+          try {
+            $using_external = (method_exists($imagick, 'isUsingExternal') && $imagick->isUsingExternal());
+          } catch (Exception $e) {
+            error_log('Erreur test isUsingExternal: ' . $e->getMessage());
+          }
+          
+          if ($using_external) {
+            error_log('⚠ External ImageMagick détecté sans IPTC existant');
+            error_log('⚠ External ImageMagick ne peut pas créer l\'IPTC → Fallback exiftool');
+            // Sauvegarder XMP d'abord
+            $imagick->writeImage($image_path);
+            $imagick->clear();
+            $imagick->destroy();
+            // Utiliser exiftool pour l'IPTC
+            $exiftool_result = $this->writeIptcWithExiftool($image_path, $all_subjects);
+            
+            if (!$exiftool_result) {
+              error_log('❌ AVERTISSEMENT : exiftool non disponible - IPTC Keywords non écrits !');
+              return array(
+                'success' => true, 
+                'warning' => 'IPTC Keywords non écrits (exiftool manquant). Votre serveur utilise External ImageMagick qui ne peut pas créer l\'IPTC. Installez exiftool ou PHP Imagick. XMP OK mais synchronisation Piwigo non garantie.'
+              );
+            }
+            
+            error_log('=== WRITER SIMPLE : Succès (via exiftool pour External ImageMagick) ===');
+            return array('success' => true);
+          } else {
+            // PHP Imagick peut créer le segment complet
+            error_log('✓ Utilisation de la méthode Imagick (image brute sans Photoshop)');
+            $this->writeIptcProfile($imagick, $all_subjects);
+          }
+        }
+      }
+      // ==================================================
       
-      $imagick->clear();
-      $imagick->destroy();
+      // Sauvegarder (seulement si on n'a pas déjà sauvegardé via exiftool)
+      $imagick->writeImage($image_path);
       
       error_log('=== WRITER SIMPLE : Succès ===');
       
@@ -249,6 +345,43 @@ class FaceTagMetadataWriterSimple
       $iptc_profile = false;
     }
     
+    // ========== SOLUTION : CRÉER UN PROFIL IPTC MINIMAL SI INEXISTANT ==========
+    if (!$iptc_profile || strlen($iptc_profile) == 0) {
+      error_log('⚠ Pas de profil IPTC existant, création d\'un profil minimal');
+      
+      // Créer un profil IPTC minimal vide d'abord
+      $minimal_profile = '';
+      
+      // Envelope Record: 1:000 (version = 4)
+      $minimal_profile .= chr(0x1C) . chr(1) . chr(0) . pack('n', 2) . pack('n', 4);
+      
+      // Envelope Record: 1:090 (UTF-8 character set)
+      $utf8_marker = "\x1B%G";
+      $minimal_profile .= chr(0x1C) . chr(1) . chr(90) . pack('n', strlen($utf8_marker)) . $utf8_marker;
+      
+      // Application Record: 2:000 (version = 4)
+      $minimal_profile .= chr(0x1C) . chr(2) . chr(0) . pack('n', 2) . pack('n', 4);
+      
+      // Injecter ce profil minimal d'abord
+      try {
+        $imagick->setImageProfile('iptc', $minimal_profile);
+        error_log('✓ Profil IPTC minimal créé et injecté (' . strlen($minimal_profile) . ' bytes)');
+      } catch (Exception $e) {
+        error_log('⚠ Erreur lors de la création du profil IPTC minimal: ' . $e->getMessage());
+      }
+      
+      // Relire le profil pour continuer normalement
+      try {
+        $iptc_profile = $imagick->getImageProfile('iptc');
+        if ($iptc_profile) {
+          error_log('✓ Profil IPTC minimal relu: ' . strlen($iptc_profile) . ' bytes');
+        }
+      } catch (Exception $e) {
+        $iptc_profile = $minimal_profile;
+      }
+    }
+    // =========================================================================
+    
     if ($iptc_profile) {
       $iptc_data = $this->parseIptcProfile($iptc_profile);
     } else {
@@ -261,9 +394,24 @@ class FaceTagMetadataWriterSimple
     // Reconstruire
     $new_profile = $this->buildIptcProfile($iptc_data);
     
+    error_log('IPTC profile size before write: ' . strlen($new_profile) . ' bytes');
+    error_log('IPTC keywords to write: ' . implode(', ', $keywords));
+    
     $imagick->setImageProfile('iptc', $new_profile);
     
     error_log('IPTC Keywords écrits : ' . count($keywords));
+    
+    // Vérifier que l'écriture a vraiment réussi
+    try {
+      $verify = $imagick->getImageProfile('iptc');
+      if ($verify) {
+        error_log('✓ IPTC profile verified after write: ' . strlen($verify) . ' bytes');
+      } else {
+        error_log('⚠ WARNING: IPTC profile is empty after write!');
+      }
+    } catch (Exception $e) {
+      error_log('⚠ WARNING: Cannot verify IPTC after write: ' . $e->getMessage());
+    }
   }
   
   private function parseIptcProfile($binary)
@@ -306,6 +454,12 @@ class FaceTagMetadataWriterSimple
   
   private function buildIptcProfile($data)
   {
+    error_log('=== BUILD IPTC PROFILE ===');
+    error_log('Input data keys: ' . implode(', ', array_keys($data)));
+    if (isset($data['2#025'])) {
+      error_log('Keywords (2#025): ' . print_r($data['2#025'], true));
+    }
+    
     $binary = '';
     
     // Envelope Record
@@ -340,8 +494,11 @@ class FaceTagMetadataWriterSimple
       
       $values = is_array($value) ? $value : array($value);
       
+      error_log('Writing IPTC tag ' . $key . ' with ' . count($values) . ' value(s)');
+      
       foreach ($values as $val) {
         $size = strlen($val);
+        error_log('  - Value: "' . $val . '" (' . $size . ' bytes)');
         $binary .= chr(0x1C);
         $binary .= chr($record);
         $binary .= chr($tag);
@@ -350,7 +507,123 @@ class FaceTagMetadataWriterSimple
       }
     }
     
+    error_log('Total IPTC binary size: ' . strlen($binary) . ' bytes');
+    
     return $binary;
+  }
+
+  /**
+   * Écrire IPTC Keywords avec exiftool - LA solution qui marche vraiment !
+   */
+  private function writeIptcWithExiftool($image_path, $keywords)
+  {
+    error_log('=== ÉCRITURE IPTC avec exiftool ===');
+    
+    // Chemins possibles pour exiftool (priorité Synology puis Linux standard)
+    $possible_paths = array(
+      FACETAGWRITE_PATH . 'exiftool_wrapper.sh',  // Wrapper local (solution de contournement)
+      '/bin/exiftool',                  // Synology DSM 7.x
+      '/usr/bin/exiftool',              // Standard Linux
+      '/usr/local/bin/exiftool',        // Installation manuelle
+      '/opt/bin/exiftool',              // Synology Community
+      '/volume1/@appstore/exiftool/bin/exiftool',  // Synology Package
+      'exiftool'                        // PATH système
+    );
+    
+    $exiftool = null;
+    foreach ($possible_paths as $path) {
+      // Test 1 : fichier existe et exécutable (check PHP)
+      if (@file_exists($path) && @is_executable($path)) {
+        $exiftool = $path;
+        error_log('✓ exiftool trouvé (permissions OK): ' . $exiftool);
+        break;
+      }
+      
+      // Test 2 : fichier existe mais pas exécutable selon PHP → tester quand même !
+      if (@file_exists($path)) {
+        error_log('⚠ Test fallback pour: ' . $path);
+        $test_result = @shell_exec($path . ' -ver 2>&1');
+        if (!empty($test_result) && preg_match('/^\d+\.\d+/', trim($test_result))) {
+          $exiftool = $path;
+          error_log('✓ exiftool trouvé (via shell_exec): ' . $exiftool . ' version ' . trim($test_result));
+          break;
+        } else {
+          error_log('  → Échec: ' . ($test_result ? trim($test_result) : 'pas de sortie'));
+        }
+      }
+    }
+    
+    // Fallback: essayer avec which
+    if (!$exiftool) {
+      $which_result = @shell_exec('which exiftool 2>/dev/null');
+      if (!empty($which_result)) {
+        $exiftool = trim($which_result);
+        error_log('✓ exiftool trouvé via which: ' . $exiftool);
+      }
+    }
+    
+    if (!$exiftool) {
+      error_log('❌ exiftool introuvable dans les chemins suivants:');
+      foreach ($possible_paths as $path) {
+        error_log('   - ' . $path . ' : ' . (file_exists($path) ? 'existe mais non exécutable' : 'n\'existe pas'));
+      }
+      error_log('   Installation: apt-get install libimage-exiftool-perl (Debian/Ubuntu)');
+      error_log('   ou: Package Center → SynoCommunity → ExifTool (Synology)');
+      return false;
+    }
+    error_log('IPTC Keywords à écrire: ' . implode(', ', $keywords));
+    
+    // Construire les arguments pour chaque keyword
+    $args = array();
+    $args[] = '-overwrite_original';  // Pas de fichier .original
+    $args[] = '-codedcharacterset=utf8';  // UTF-8 pour les accents
+    
+    foreach ($keywords as $kw) {
+      $args[] = '-IPTC:Keywords=' . $kw;
+    }
+    
+    $args[] = $image_path;
+    
+    // Échapper tous les arguments
+    $escaped_args = array_map('escapeshellarg', $args);
+    $cmd = $exiftool . ' ' . implode(' ', $escaped_args) . ' 2>&1';
+    
+    error_log('Commande: exiftool -overwrite_original -codedcharacterset=utf8 ' . count($keywords) . ' keywords');
+    
+    // Exécuter
+    $output = array();
+    $return_var = 0;
+    exec($cmd, $output, $return_var);
+    
+    if ($return_var !== 0) {
+      error_log('❌ exiftool a échoué (code retour: ' . $return_var . ')');
+      if (!empty($output)) {
+        error_log('Output: ' . implode("\n", $output));
+      }
+      return false;
+    }
+    
+    error_log('✓ exiftool terminé avec succès');
+    if (!empty($output)) {
+      foreach ($output as $line) {
+        error_log('  ' . $line);
+      }
+    }
+    
+    // Vérifier avec exiftool
+    $verify_cmd = $exiftool . ' -IPTC:Keywords -s3 ' . escapeshellarg($image_path) . ' 2>&1';
+    $verify_output = shell_exec($verify_cmd);
+    
+    if ($verify_output) {
+      $found_keywords = array_filter(array_map('trim', explode("\n", $verify_output)));
+      if (count($found_keywords) > 0) {
+        error_log('✓ IPTC Keywords vérifiés: ' . implode(', ', $found_keywords));
+        return true;
+      }
+    }
+    
+    error_log('⚠ Impossible de vérifier les IPTC Keywords');
+    return true;  // On considère que c'est OK si exiftool n'a pas renvoyé d'erreur
   }
 
   

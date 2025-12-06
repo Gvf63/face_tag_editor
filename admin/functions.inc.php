@@ -5,7 +5,7 @@ defined('PHPWG_ROOT_PATH') or die('Hacking attempt!');
  * Crée et affiche le tabsheet (onglets) pour les pages d'administration
  * @param string $selected L'onglet actuellement sélectionné ('config', 'config2', 'help')
  */
-function facetag_admin_tabsheet($selected = 'help')
+function facetageditor_admin_tabsheet($selected = 'help')
 {
   include_once(PHPWG_ROOT_PATH.'admin/include/tabsheet.class.php');
   $tabsheet = new tabsheet();

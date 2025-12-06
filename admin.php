@@ -17,6 +17,6 @@ if (file_exists($page_path))
 else
 {
   // Par défaut, charger help.php
-  include(FACETAG_PATH . 'admin/help.php');
+  include(FACETAGWRITE_PATH . 'admin/help.php');
 }
 ?>

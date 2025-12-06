@@ -1,7 +1,7 @@
 <?php
 /*
 Plugin Name: face_tag_editor
-Version: 1.6
+Version: 1.7A
 Description: Créer et enregistrer les tags de visages dans les métadonnées XMP (mode modal) 
 Plugin URI: https://fr.piwigo.org/ext/index.php?eid=1053
 Author: Charles69
@@ -10,8 +10,12 @@ Has Settings: webmaster
 
 //============= VERSIONS ============================================
 /*
+version 1.7A - 06/12/2025 
+    base PHP Imagick , External Imagick, Exiftool
+    corrigé problème avec item Photoshop 
+    à voir 270CW ?
 
-version 1.6 - 04/12/2025 
+version 1.6 - 04/12/2025 diffusée
     à voir : 270 CW
     External Imagick & PHP IMagick
     corrigé : saisie nom annule
@@ -107,8 +111,6 @@ require_once(FACETAGWRITE_PATH . 'lib/file_resolver.php');
 require_once(FACETAGWRITE_PATH . 'lib/restore_original.php');
 require_once(FACETAGWRITE_PATH . 'img/icon_svg.php'); // image du bouton taguer
 
-// TEST : Vérifier que la fonction existe
-//error_log('TEST: fonction restore existe ? ' . (function_exists('face_tag_write_restore_original') ? 'OUI' : 'NON'));
 
 
 // Initialisation
@@ -679,7 +681,7 @@ function face_tag_write_save_xmp($params, &$service)
   error_log('Métadonnées fusionnées');
   
   // Nettoyer le fichier de lecture
-  @unlink($temp_for_reading);
+  //@unlink($temp_for_reading);
   
   // Écrire métadonnées sur le fichier temporaire
   try {
@@ -733,7 +735,7 @@ function face_tag_write_save_xmp($params, &$service)
     }
 
     // Nettoyer le fichier temporaire
-    @unlink($temp_file);
+    //@unlink($temp_file);
     
     // Régénérer les miniatures  
     
@@ -748,12 +750,21 @@ function face_tag_write_save_xmp($params, &$service)
     error_reporting($old_error_reporting);
     ini_set('display_errors', $old_display_errors);
     
-    return array(
+    $response = array(
       'stat' => 'ok',
       'message' => 'XMP saved successfully',
       'faces_count' => count($faces),
       'backup_created' => $backup_created
     );
+    
+    // Propager le warning si exiftool manque
+    if (isset($result['warning'])) {
+      $response['warning'] = $result['warning'];
+      error_log('⚠ Warning propagé au client: ' . $result['warning']);
+    }
+    
+    return $response;
+
   }
   else
   {

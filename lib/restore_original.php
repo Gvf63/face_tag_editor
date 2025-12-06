@@ -76,7 +76,7 @@ function face_tag_write_restore_original($params, &$service)
   // Rendre le fichier actuel writable
   @chmod($real_local_path, 0666);
   
-// Copier le backup par-dessus le fichier actuel
+  // Copier le backup par-dessus le fichier actuel
   if (!@copy($backup_path, $real_local_path)) {
     error_log('❌ Échec de la copie du backup');
     error_reporting($old_error_reporting);
@@ -99,6 +99,14 @@ function face_tag_write_restore_original($params, &$service)
       include_once(PHPWG_ROOT_PATH . 'admin/include/functions.php');
       include_once(PHPWG_ROOT_PATH . 'admin/include/functions_metadata.php');
     }
+
+    // ✅ IMPORTANT: Supprimer les tags de la base AVANT de synchroniser
+    // Sinon les anciens tags restent dans l'interface
+    $query = '
+    DELETE FROM ' . IMAGE_TAG_TABLE . '
+    WHERE image_id = ' . intval($params['image_id']);
+    pwg_query($query);
+    error_log('✓ Tags supprimés de la base de données');
 
     if (function_exists('sync_metadata')) {
       sync_metadata(array($params['image_id']));

@@ -21,6 +21,7 @@ class ImagickWrapper
     return new self($image_path);
   }
 
+ //---------------------------------------------------------------------------------------- 
   private function __construct($image_path)
   {
     $this->image_path = $image_path;
@@ -28,6 +29,7 @@ class ImagickWrapper
 
     // Try PHP Imagick extension first
     if (extension_loaded('imagick')) {
+//    if (false && extension_loaded('imagick')) {  // ← DÉSACTIVÉ POUR TEST
       try {
         $this->imagick = new Imagick($image_path);
         error_log('INFO: Using PHP Imagick extension');
@@ -83,6 +85,7 @@ class ImagickWrapper
     return $this->error;
   }
 
+  //---------------------------------------------------------------------------------
   public function getImageProfile($profile_name)
   {
     if ($this->hasError()) {
@@ -101,6 +104,131 @@ class ImagickWrapper
     }
   }
 
+//-----------------------------------------------------------------------------
+  public function removeImageProfile($profile_name)
+  {
+    if ($this->hasError()) {
+      return false;
+    }
+
+    if (!$this->use_external) {
+      try {
+        return $this->imagick->removeImageProfile($profile_name);
+      } catch (Exception $e) {
+        error_log('Error removing profile via PHP Imagick: ' . $e->getMessage());
+        return false;
+      }
+    } else {
+      // External ImageMagick - utiliser convert avec +profile
+      return $this->removeProfileExternal($profile_name);
+    }
+  }
+
+  private function removeProfileExternal($profile_name)
+  {
+    $temp_output = tempnam(sys_get_temp_dir(), 'imgout_');
+
+    try {
+      error_log('External ImageMagick: Removing ' . $profile_name . ' profile');
+      
+      // Créer un backup avant modification
+      $backup_image = $this->image_path . '.bak_remove';
+      if (!@copy($this->image_path, $backup_image)) {
+        error_log('Failed to create backup of image');
+        @unlink($temp_output);
+        return false;
+      }
+
+      // Commande pour supprimer le profil
+      // +profile supprime, -profile ajoute
+      if ($profile_name === '8BIM') {
+        // Supprimer le profil Photoshop APP13
+        $cmd = 'convert ' . escapeshellarg($this->image_path) .
+               ' +profile "8BIM" ' .
+               escapeshellarg($temp_output) .
+               ' 2>&1';
+      } elseif ($profile_name === 'iptc') {
+        $cmd = 'convert ' . escapeshellarg($this->image_path) .
+               ' +profile "iptc" ' .
+               escapeshellarg($temp_output) .
+               ' 2>&1';
+      } elseif ($profile_name === 'xmp') {
+        $cmd = 'convert ' . escapeshellarg($this->image_path) .
+               ' +profile "xmp" ' .
+               escapeshellarg($temp_output) .
+               ' 2>&1';
+      } else {
+        error_log('Unsupported profile type for removal: ' . $profile_name);
+        @unlink($temp_output);
+        @unlink($backup_image);
+        return false;
+      }
+      
+      error_log('External ImageMagick command: convert IMAGE +profile "' . $profile_name . '" OUTPUT');
+      
+      $return_var = 0;
+      $output = array();
+      @exec($cmd, $output, $return_var);
+      
+      // Nettoyer
+      if ($return_var !== 0) {
+        error_log('External convert command failed (return code: ' . $return_var . ')');
+        if (!empty($output)) {
+          error_log('Convert stderr: ' . implode("\n", $output));
+        }
+        @unlink($temp_output);
+        @unlink($backup_image);
+        return false;
+      }
+
+      // Vérifier que le fichier de sortie existe
+      if (!file_exists($temp_output) || filesize($temp_output) == 0) {
+        error_log('ERROR: Output file invalid after convert +profile');
+        @unlink($temp_output);
+        @unlink($backup_image);
+        return false;
+      }
+
+      $output_size = filesize($temp_output);
+      error_log('Profile removed, output file size: ' . $output_size . ' bytes');
+
+      // Remplacer l'original par le fichier sans profil
+      if (!@copy($temp_output, $this->image_path)) {
+        error_log('Failed to copy output to original path');
+        @unlink($temp_output);
+        @copy($backup_image, $this->image_path);
+        @unlink($backup_image);
+        return false;
+      }
+
+      error_log('✓ File successfully updated at: ' . $this->image_path);
+      
+      // Vérifier que le fichier a bien été écrit
+      clearstatcache(true, $this->image_path);
+      $final_size = filesize($this->image_path);
+      error_log('✓ Final file size: ' . $final_size . ' bytes');
+
+      // Nettoyer
+      @unlink($temp_output);
+      @unlink($backup_image);
+      
+      error_log('✓ External ImageMagick: Profile removed successfully');
+      return true;
+
+    } catch (Exception $e) {
+      error_log('Error removing profile via external ImageMagick: ' . $e->getMessage());
+      @unlink($temp_output);
+      if (isset($backup_image) && file_exists($backup_image)) {
+        @copy($backup_image, $this->image_path);
+        @unlink($backup_image);
+      }
+      return false;
+    }
+  }
+
+
+
+  //-----------------------------------------------------------------------
   private function getProfileExternal($profile_name)
   {
     $temp_profile = tempnam(sys_get_temp_dir(), 'imgprof_');
@@ -438,7 +566,10 @@ class ImagickWrapper
       return 'error';
     }
     return $this->use_external ? 'external' : 'php-imagick';
+
   }
+
+
 
 }
 ?>

@@ -345,6 +345,17 @@ $.ajax({
       msg += 'Backup: Déjà existant';
     }
     
+    // Afficher le warning UNIQUEMENT si exiftool manque (image sans IPTC)
+    if (result.warning) {
+      msg += '\n⚠️ AVERTISSEMENT - Configuration incomplète:\n\n';
+      msg += 'Cette image n\'avait pas de métadonnées IPTC.\n';
+      msg += 'L\'outil "exiftool" est nécessaire pour créer l\'IPTC sur ce type d\'images.\n\n';
+      msg += '→ Tags enregistrés en XMP uniquement\n';
+      msg += '→ Synchronisation Piwigo non garantie\n\n';
+      msg += 'Solution: Installer exiftool sur le serveur (contactez l\'administrateur)';
+    }
+
+
     alert(msg);
     closeModal();
 
