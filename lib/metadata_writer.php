@@ -36,7 +36,7 @@ class FaceTagMetadataWriterSimple
   /**
    * Écrire les métadonnées - APPROCHE SIMPLE
    */
-  public function writeMetadata($image_path, $faces, $merged_data = null)
+  public function writeMetadata($image_path, $faces, $merged_data = null, $description = null)
   {
     try {
       error_log('=== WRITER SIMPLE : Début ===');
@@ -113,6 +113,9 @@ class FaceTagMetadataWriterSimple
           // Image avec IPTC existant → Imagick fonctionne bien
           error_log('✓ Utilisation de la méthode Imagick (IPTC existant)');
           $this->writeIptcProfile($imagick, $all_subjects);
+
+            
+
         } elseif ($has_empty_photoshop) {
           // Segment Photoshop vide → Le supprimer pour permettre à Imagick de créer l'IPTC
           error_log('⚠ Segment Photoshop vide détecté (Affinity/Lightroom)');
@@ -187,6 +190,12 @@ class FaceTagMetadataWriterSimple
         }
       }
       // ==================================================
+
+      // Écrire la description IPTC si fournie
+      if ($description && strlen($description) > 0) {
+        $this->writeIptcComment($imagick, $description);
+        error_log('Description IPTC écrite: ' . strlen($description) . ' caractères');
+      }
       
       // Sauvegarder (seulement si on n'a pas déjà sauvegardé via exiftool)
       $imagick->writeImage($image_path);
@@ -625,6 +634,48 @@ class FaceTagMetadataWriterSimple
     error_log('⚠ Impossible de vérifier les IPTC Keywords');
     return true;  // On considère que c'est OK si exiftool n'a pas renvoyé d'erreur
   }
+
+/**
+   * Écrire IPTC Comment (2#120)
+   */
+  private function writeIptcComment($imagick, $comment)
+  {
+    try {
+      $iptc_profile = $imagick->getImageProfile('iptc');
+    } catch (Exception $e) {
+      $iptc_profile = false;
+    }
+    
+    if (!$iptc_profile || strlen($iptc_profile) == 0) {
+      $minimal_profile = '';
+      $minimal_profile .= chr(0x1C) . chr(1) . chr(0) . pack('n', 2) . pack('n', 4);
+      $utf8_marker = "\x1B%G";
+      $minimal_profile .= chr(0x1C) . chr(1) . chr(90) . pack('n', strlen($utf8_marker)) . $utf8_marker;
+      $minimal_profile .= chr(0x1C) . chr(2) . chr(0) . pack('n', 2) . pack('n', 4);
+      
+      try {
+        $imagick->setImageProfile('iptc', $minimal_profile);
+      } catch (Exception $e) {
+      }
+      
+      try {
+        $iptc_profile = $imagick->getImageProfile('iptc');
+      } catch (Exception $e) {
+        $iptc_profile = $minimal_profile;
+      }
+    }
+    
+    if ($iptc_profile) {
+      $iptc_data = $this->parseIptcProfile($iptc_profile);
+    } else {
+      $iptc_data = array();
+    }
+    
+    $iptc_data['2#120'] = $comment;
+    $new_profile = $this->buildIptcProfile($iptc_data);
+    $imagick->setImageProfile('iptc', $new_profile);
+  }
+
 
   
 }

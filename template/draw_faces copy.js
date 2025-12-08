@@ -1092,16 +1092,16 @@ canvas.on('object:modified', function(e) {
       var existingNames = faces.map(f => f.name).filter((v, i, a) => a.indexOf(v) === i);
       
       var nameModal = `
-        <div id="facetag-name-modal">
-          <h3>Nommer la personne</h3>
-          <input type="text" id="facetag-name-input" placeholder="Nom de la personne">
-          ${existingNames.length > 0 ? '<div class="existing-names-list">Personnes existantes : ' + existingNames.join(', ') + '</div>' : ''}
-          <div class="modal-buttons">
-            <button id="facetag-name-cancel">Annuler</button>
-            <button id="facetag-name-save">Valider</button>
+        <div id="facetag-name-modal" style="position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:white; padding:30px; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,0.3); z-index:10001; min-width:400px;">
+          <h3 style="margin-top:0;">Nommer la personne</h3>
+          <input type="text" id="facetag-name-input" placeholder="Nom de la personne" style="width:100%; padding:10px; margin:15px 0; font-size:16px; border:2px solid #ddd; border-radius:4px;">
+          ${existingNames.length > 0 ? '<div style="margin-top:10px; color:#666; font-size:13px;">Personnes existantes : ' + existingNames.join(', ') + '</div>' : ''}
+          <div style="text-align:right; margin-top:20px;">
+            <button id="facetag-name-cancel" style="padding:10px 20px; margin-right:10px; background:#ccc; border:none; border-radius:4px; cursor:pointer;">Annuler</button>
+            <button id="facetag-name-save" style="padding:10px 20px; background:#4CAF50; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Valider</button>
           </div>
         </div>
-        <div id="facetag-name-overlay"></div>
+        <div id="facetag-name-overlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10000;"></div>
       `;
       
       $('body').append(nameModal);
@@ -1154,17 +1154,17 @@ closeNameModal();
       var existingNames = faces.map(f => f.name).filter((v, i, a) => a.indexOf(v) === i);
 
       var renameModal = `
-        <div id="facetag-rename-modal">
-          <h3>Renommer la personne</h3>
-          <p class="rename-old-name">Ancien nom : <strong>${face.name}</strong></p>
-          <input type="text" id="facetag-rename-input" placeholder="Nouveau nom" value="${face.name}">
-          ${existingNames.length > 0 ? '<div class="existing-names-list">Autres personnes : ' + existingNames.filter(n => n !== face.name).join(', ') + '</div>' : ''}
-          <div class="modal-buttons">
-            <button id="facetag-rename-cancel">Annuler</button>
-            <button id="facetag-rename-save">Renommer</button>
+        <div id="facetag-rename-modal" style="position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:white; padding:30px; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,0.3); z-index:10001; min-width:400px;">
+          <h3 style="margin-top:0;">Renommer la personne</h3>
+          <p style="color:#666; font-size:13px;">Ancien nom : <strong>${face.name}</strong></p>
+          <input type="text" id="facetag-rename-input" placeholder="Nouveau nom" value="${face.name}" style="width:100%; padding:10px; margin:15px 0; font-size:16px; border:2px solid #ddd; border-radius:4px;">
+          ${existingNames.length > 0 ? '<div style="margin-top:10px; color:#666; font-size:13px;">Autres personnes : ' + existingNames.filter(n => n !== face.name).join(', ') + '</div>' : ''}
+          <div style="text-align:right; margin-top:20px;">
+            <button id="facetag-rename-cancel" style="padding:10px 20px; margin-right:10px; background:#ccc; border:none; border-radius:4px; cursor:pointer;">Annuler</button>
+            <button id="facetag-rename-save" style="padding:10px 20px; background:#4CAF50; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Renommer</button>
           </div>
         </div>
-        <div id="facetag-rename-overlay"></div>
+        <div id="facetag-rename-overlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10000;"></div>
       `;
 
       $('body').append(renameModal);
