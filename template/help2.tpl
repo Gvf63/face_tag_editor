@@ -105,8 +105,8 @@
         
         <h3>RESOLUTION</h3>
         <p>Transmettre les informations, la console et le fichier de log</p>
-        <p>ainsi qu'une description de la ce qui a provoqué le plantage à </p>
-        <p>chawigo AT free DOT fr</p>
+        <p>ainsi qu'une description de la ce qui a provoqué le plantage sur </p>
+        <p>le forum</p>
         
     </div>
 
@@ -130,7 +130,7 @@
         <h3>RESOLUTION</h3>
         <p>Send the information, the console, and the log file</p>
         <p>along with a description of what caused the crash to </p>
-        <p>chawigo AT free DOT fr</p>
+        <p>the forum</p>
     </div>
 </div>
 

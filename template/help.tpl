@@ -96,7 +96,8 @@
         <ul>
             <li>créer/supprimer des cadres visages</li>
             <li>déplacer, redimensionner un cadre de visage</li>
-            <li>pour renommer il faut créer un cadre visage et supprimer l'ancien</li>
+            <li>pour renommer double cliquer sur le cadre</li>
+            <li>saisir/modifier la description de la photo</li>
         </ul>
         
         <h3>Droits d'accès</h3>
@@ -153,7 +154,8 @@
         <ul>
             <li>create/delete face frames</li>
             <li>move and resize a face frame</li>
-            <li>to rename a face frame, you must create a new one and delete the old one</li>
+            <li>To rename, double-click on the frame.</li>
+            <li>enter/edit the photo description.</li>
         </ul>
         
         <h3>Access Rights</h3>

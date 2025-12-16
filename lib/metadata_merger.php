@@ -15,7 +15,23 @@ class FaceTagMetadataMerger
   {
     // Lire métadonnées actuelles
     $current = $this->reader->readAll($image_path);
-    
+
+
+    // === DEBUG ===
+    error_log('=== MERGER DEBUG ===');
+    error_log('Faces actuelles: ' . (isset($current['xmp']['faces']) ? count($current['xmp']['faces']) : 0));
+    error_log('Nouvelles faces: ' . count($new_faces));
+    if (isset($current['xmp']['faces'])) {
+        foreach ($current['xmp']['faces'] as $f) {
+            error_log('Face actuelle: ' . $f['name']);
+        }
+    }
+    foreach ($new_faces as $f) {
+        error_log('Nouvelle face: ' . $f['name']);
+    }
+    // === END DEBUG ===
+
+
     error_log('=== DEBUG MERGER ===');
     error_log('Current metadata keys: ' . implode(', ', array_keys($current)));
     

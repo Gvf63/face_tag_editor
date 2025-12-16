@@ -1,7 +1,7 @@
 <?php
 /*
 Plugin Name: face_tag_editor
-Version: 1.8
+Version: 1.9C
 Description: Créer et enregistrer les tags de visages dans les métadonnées XMP et description 
 Plugin URI: https://piwigo.org/ext/extension_view.php?eid=1053
 Author: Charles69
@@ -10,6 +10,16 @@ Has Settings: webmaster
 
 //============= VERSIONS ============================================
 /*
+version 1.9C en cours  16/12/2025
+    suite à régression de fonctionnalités avec External Imagick seul
+    fonctionnement sans exiftool 
+    corrigé orientation 270CW
+
+
+version 1.9 - 10/12/2025 diffusée
+    changement de méthode pour la lecture des visages en php  pur
+    traduction en anglais de l'interface
+
 version 1.8 - 08/12/2025
     ajouté description ( commment )
     modifié Plugin URI
@@ -107,6 +117,12 @@ ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 ini_set('error_log', './plugins/face_tag_editor/face_tag_editor_debug.log');
 
+
+
+// Utilisation de la méthode face_tag V2
+require_once(FACETAGWRITE_PATH . 'lib/editor_xmp_ex.php');
+
+
   // Charger les classes
 require_once(FACETAGWRITE_PATH . 'lib/imagick_wrapper.php');
 require_once(FACETAGWRITE_PATH . 'lib/metadata_writer.php');
@@ -116,14 +132,6 @@ require_once(FACETAGWRITE_PATH . 'lib/restore_original.php');
 require_once(FACETAGWRITE_PATH . 'img/icon_svg.php'); // image du bouton taguer
 
 
-
-// Initialisation
-add_event_handler('init', 'face_tag_write_init');
-
-function face_tag_write_init()
-{
-  load_language('plugin.lang', FACETAGWRITE_PATH);
-}
 
 // ==================== CHARGER JQUERY ====================
 add_event_handler('loc_begin_page_header', 'face_tag_write_load_jquery');
@@ -165,6 +173,65 @@ function face_tag_write_load_scripts()
   $template->append('footer_elements', '
   <script src="' . FACETAGWRITE_PATH . 'template/draw_faces.js"></script>
   ');
+}
+
+//===================== TRADUCTION DE l'EDITEUR =================
+
+add_event_handler('loc_begin_page_header', 'face_tag_editor_load_translations');
+
+function face_tag_editor_load_translations()
+{
+  global $template;
+  
+  load_language('plugin.lang', FACETAGWRITE_PATH);
+  
+  // Injecter directement les traductions en JavaScript
+  $js_translations = "
+<script type=\"text/javascript\">
+var facetagLang = {
+  'Éditeur de visages': '" . l10n('Éditeur de visages') . "',
+  'Image': '" . l10n('Image') . "',
+  'Instructions :': '" . l10n('Instructions :') . "',
+  'Cliquez et faites glisser sur l\'image pour dessiner un rectangle autour d\'un visage. Double-cliquez sur un cadre pour renommer un visage': '" . l10n('Cliquez et faites glisser sur l\'image pour dessiner un rectangle autour d\'un visage. Double-cliquez sur un cadre pour renommer un visage') . "',
+  'Visages tagués': '" . l10n('Visages tagués') . "',
+  'Aucun visage tagué': '" . l10n('Aucun visage tagué') . "',
+  'Tout effacer': '" . l10n('Tout effacer') . "',
+  'Restaurer l\'original': '" . l10n('Restaurer l\'original') . "',
+  'Restaurer le fichier .original (supprime tous les tags)': '" . l10n('Restaurer le fichier .original (supprime tous les tags)') . "',
+  'Description...': '" . l10n('Description...') . "',
+  'Annuler': '" . l10n('Annuler') . "',
+  'Enregistrer': '" . l10n('Enregistrer') . "',
+  'existant': '" . l10n('existant') . "',
+  'Supprimer': '" . l10n('Supprimer') . "',
+  'Nommer la personne': '" . l10n('Nommer la personne') . "',
+  'Nom de la personne': '" . l10n('Nom de la personne') . "',
+  'Personnes existantes :': '" . l10n('Personnes existantes :') . "',
+  'Valider': '" . l10n('Valider') . "',
+  'Veuillez entrer un nom': '" . l10n('Veuillez entrer un nom') . "',
+  'Renommer la personne': '" . l10n('Renommer la personne') . "',
+  'Ancien nom :': '" . l10n('Ancien nom :') . "',
+  'Nouveau nom': '" . l10n('Nouveau nom') . "',
+  'Autres personnes :': '" . l10n('Autres personnes :') . "',
+  'Renommer': '" . l10n('Renommer') . "',
+  
+'Aucun visage à effacer': '" . l10n('Aucun visage à effacer') . "',
+'✅ Fichier original restauré avec succès !': '" . l10n('✅ Fichier original restauré avec succès !') . "',
+'❌ Aucun fichier .original trouvé à restaurer.\\n\\nLe fichier original n\'existe que si vous avez déjà enregistré des tags.': '" . l10n('❌ Aucun fichier .original trouvé à restaurer.\\n\\nLe fichier original n\'existe que si vous avez déjà enregistré des tags.') . "',
+'❌ Accès refusé. Vous n\'avez pas les permissions nécessaires.': '" . l10n('❌ Accès refusé. Vous n\'avez pas les permissions nécessaires.') . "',
+'Voulez-vous vraiment supprimer tous les tags de visages de cette image ?': '" . l10n('Voulez-vous vraiment supprimer tous les tags de visages de cette image ?') . "',
+'Êtes-vous sûr de vouloir effacer tous les rectangles ?': '" . l10n('Êtes-vous sûr de vouloir effacer tous les rectangles ?') . "',
+'⚠️ ATTENTION ⚠️\\n\\nCette action va :\\n• Restaurer le fichier .original \\n• Régénérer les miniatures\\n\\nÊtes-vous sûr de vouloir continuer ?': '" . l10n('⚠️ ATTENTION ⚠️\\n\\nCette action va :\\n• Restaurer le fichier .original \\n• Régénérer les miniatures\\n\\nÊtes-vous sûr de vouloir continuer ?') . "',
+
+'✅ Visages enregistrés avec succès !': '" . l10n('✅ Visages enregistrés avec succès !') . "',
+'Visages: ': '" . l10n('Visages: ') . "',
+'Backup créé: Oui (.original)': '" . l10n('Backup créé: Oui (.original)') . "',
+'Backup: Déjà existant': '" . l10n('Backup: Déjà existant') . "',
+
+};
+</script>
+";
+  
+  $template->append('head_elements', $js_translations);
 }
 
 // ==================== AJOUTER LE BOUTON ====================
@@ -234,29 +301,15 @@ function face_tag_write_add_button()
   $image_url = embellish_url(get_root_url() . $original_path);
   $save_url = get_root_url() . 'ws.php?format=json&method=facetagwrite.saveXMP';
   
-// Vérifier si le fichier de backup .original existe
+  // Vérifier si le fichier de backup .original existe
   $real_local_path = face_tag_write_resolve_path($row['path']);
   $has_original = file_exists($real_local_path . '.original') ? 'true' : 'false';
 
+  // Textes traduits
+  $tag_text = l10n('Taguer');
+  $tag_title = l10n('Taguer les visages');
 
-// VERSION 1 : Thème par défaut - SANS styles inline
-$button_html = '
-  <a href="#" 
-     id="facetag-open-editor"
-     data-image-id="' . $picture['current']['id'] . '"
-     data-image-src="' . $image_url . '"
-     data-save-url="' . $save_url . '"
-     data-has-original="' . $has_original . '"
-     data-description="' . htmlspecialchars($row['comment'] ?? '', ENT_QUOTES, 'UTF-8') . '"
-     class="pwg-state-default pwg-button" 
-     title="Taguer les visages" 
-     rel="nofollow">
-    <span class="pwg-icon">' . FACETAGWRITE_ICON . '</span>
-    <span class="pwg-button-text">Taguer</span>
-  </a>';
-
-// VERSION 2 : Thèmes Bootstrap - SANS styles inline
-if ($user['theme'] == 'bootstrapdefault' || $user['theme'] == 'bootstrap_darkroom') {
+  // VERSION 1 : Thème par défaut - SANS styles inline
   $button_html = '
     <a href="#" 
        id="facetag-open-editor"
@@ -265,16 +318,32 @@ if ($user['theme'] == 'bootstrapdefault' || $user['theme'] == 'bootstrap_darkroo
        data-save-url="' . $save_url . '"
        data-has-original="' . $has_original . '"
        data-description="' . htmlspecialchars($row['comment'] ?? '', ENT_QUOTES, 'UTF-8') . '"
-       class="btn btn-primary" 
-       title="Taguer les visages" 
+       class="pwg-state-default pwg-button" 
+       title="' . $tag_title . '" 
        rel="nofollow">
-      ' . FACETAGWRITE_ICON . ' Taguer
+      <span class="pwg-icon">' . FACETAGWRITE_ICON . '</span>
+      <span class="pwg-button-text">' . $tag_text . '</span>
     </a>';
-}
+
+  // VERSION 2 : Thèmes Bootstrap - SANS styles inline
+  if ($user['theme'] == 'bootstrapdefault' || $user['theme'] == 'bootstrap_darkroom') {
+    $button_html = '
+      <a href="#" 
+         id="facetag-open-editor"
+         data-image-id="' . $picture['current']['id'] . '"
+         data-image-src="' . $image_url . '"
+         data-save-url="' . $save_url . '"
+         data-has-original="' . $has_original . '"
+         data-description="' . htmlspecialchars($row['comment'] ?? '', ENT_QUOTES, 'UTF-8') . '"
+         class="btn btn-primary" 
+         title="' . $tag_title . '" 
+         rel="nofollow">
+        ' . FACETAGWRITE_ICON . ' ' . $tag_text . '
+      </a>';
+  }
   
   $template->concat('PLUGIN_PICTURE_ACTIONS', $button_html);
 }
-
 // ==================== WEB SERVICE ====================
 add_event_handler('ws_add_methods', 'face_tag_write_ws_methods');
 
@@ -290,6 +359,19 @@ function face_tag_write_ws_methods($arr)
   null,
   array('admin_only' => true)
   );
+
+  //----------------------------
+  $service->addMethod(
+  'facetagwrite.getFaces',
+  'facetagwrite_ws_get_faces',
+  array(
+    'image_id' => array('default' => null),
+  ),
+  'Récupère les faces déjà parsées d\'une image',
+  null,
+  array('admin_status' => ACCESS_GUEST)
+);
+
   
   $service->addMethod(
     'facetagwrite.getXMP',
@@ -390,11 +472,13 @@ function face_tag_write_get_xmp($params, &$service)
   if (!is_dir($temp_dir)) {
     mkdir($temp_dir, 0755, true);
     if (!is_dir($temp_dir)) {
-      alert("Créer un repertoire tmp, ./_data/tmp avec des droits en écriture");
+      error_log("Créer un repertoire tmp, ./_data/tmp avec des droits en écriture");
     }
   } else {
     error_log("3 - le rep ./_data/tmp existe");
   }
+
+
   $temp_file = $temp_dir . '/facetag_write_' . uniqid() . '.jpg';
 
   // Lire le fichier local directement (pas de allow_url_fopen nécessaire)
@@ -462,6 +546,20 @@ function face_tag_write_get_xmp($params, &$service)
   ini_set('display_errors', $old_display_errors);
   
   error_log('SUCCESS: Returning data');
+
+  // === AJOUT : Parser les faces côté serveur ===
+  require_once(FACETAGWRITE_PATH . 'lib/metadata_reader.php');
+  $reader = new FaceTagMetadataReader();
+  $metadata = $reader->readAll($real_local_path);
+  
+  $faces = isset($metadata['xmp']['faces']) ? $metadata['xmp']['faces'] : array();
+  
+  error_log('Faces parsées côté serveur: ' . count($faces));
+  
+  // Ajouter les faces au XMP
+  if (!isset($xmp_data['faces'])) {
+    $xmp_data['faces'] = $faces;
+  }
 
   return array(
     'stat' => 'ok',
@@ -563,11 +661,17 @@ if (is_dir($temp_dir)) {
     return new PwgError(WS_ERR_INVALID_PARAM, 'Missing faces data');
   }
   
-  // Récupérer la description (optionnel)
-  $description = isset($params['description']) ? trim($params['description']) : null;
-  if ($description) {
-    error_log('Description reçue: ' . strlen($description) . ' caractères');
-  }
+ // Récupérer la description - forcer null si vide    ---------------------------------------------------------        V1.9A
+
+$description = isset($params['description']) ? stripslashes(trim($params['description'])) : null;
+if ($description === '') {
+  $description = null;
+  error_log('Description vide - sera supprimée');
+} else if ($description !== null) {
+  error_log('Description reçue: ' . strlen($description) . ' caractères');
+} else {
+  error_log('Description non fournie (null)');
+}
   
  $faces_json = $params['faces'];
 
@@ -709,7 +813,7 @@ if (is_dir($temp_dir)) {
   error_log('Métadonnées fusionnées');
   
   // Nettoyer le fichier de lecture
-  //@unlink($temp_for_reading);
+  @unlink($temp_for_reading);
   
   // Écrire métadonnées sur le fichier temporaire
   try {
@@ -763,12 +867,12 @@ if (is_dir($temp_dir)) {
     }
 
     // Nettoyer le fichier temporaire
-    //@unlink($temp_file);
+    @unlink($temp_file);
     
     // Régénérer les miniatures  
     
     try {
-      face_tag_write_regenerate_metadata($params['image_id']);
+      face_tag_write_regenerate_metadata($params['image_id'], count($faces) > 0, strlen($description) > 0);
       error_log(' Métadata synchronisées');
     } catch (Exception $e) {
       error_log('Erreur synchro metadonnées: ' . $e->getMessage());
@@ -805,7 +909,7 @@ if (is_dir($temp_dir)) {
 }
 
 // ==================== SYNCHRONISATION DES METADONNEES ====================
-function face_tag_write_regenerate_metadata($image_id)
+function face_tag_write_regenerate_metadata($image_id, $has_faces = true, $has_description = true)
 {
   
   // Charge les fichiers nécessaires
@@ -816,16 +920,73 @@ function face_tag_write_regenerate_metadata($image_id)
   if (!function_exists('tag_id_from_tag_name')) {
     include_once(PHPWG_ROOT_PATH . 'admin/include/functions.php');
   }
-  
-  try {
-    sync_metadata(array($image_id));
-    error_log('✓ Métadonnées Piwigo synchronisées pour image ' . $image_id);
-  } catch (Exception $e) {
-    error_log('⚠ Erreur synchronisation des métadonnées: ' . $e->getMessage());
+
+  // Si plus de visages, supprimer tous les tags de l'image
+  if (!$has_faces) {
+    error_log('Suppression des tags Piwigo (plus de visages)');
+    $query = 'DELETE FROM ' . IMAGE_TAG_TABLE . ' WHERE image_id = ' . intval($image_id);
+    pwg_query($query);
   }
+
+  // Si plus de description, la supprimer
+  if (!$has_description) {
+    error_log('Suppression de la description Piwigo');
+    $query = 'UPDATE ' . IMAGES_TABLE . ' SET comment = NULL WHERE id = ' . intval($image_id);
+    pwg_query($query);
+  }
+
+    sync_metadata(array($image_id));
+    invalidate_user_cache();
+    error_log('✓ Métadonnées Piwigo synchronisées pour image ' . $image_id);
   
  return true;
 }
+
+//------------------------------------------------------------------------------
+// Nouvelle fonction Web Service
+function facetagwrite_ws_get_faces($params, &$service)
+{
+  if (empty($params['image_id']))
+  {
+    return new PwgError(WS_ERR_INVALID_PARAM, 'Missing image_id');
+  }
+  
+  // Récupérer le chemin de l'image
+  $query = '
+SELECT path
+FROM ' . IMAGES_TABLE . '
+WHERE id = ' . intval($params['image_id']);
+  
+  $result = pwg_query($query);
+  $row = pwg_db_fetch_assoc($result);
+  
+  if (!$row) {
+    return new PwgError(404, 'Image not found');
+  }
+  
+  $image_path = PHPWG_ROOT_PATH . $row['path'];
+  $image_path = face_tag_write_resolve_path($row['path']);
+  
+  if (!file_exists($image_path)) {
+    return new PwgError(404, 'Image file not found');
+  }
+  
+  // Utiliser metadata_reader pour lire les faces
+  require_once(FACETAGWRITE_PATH . 'lib/metadata_reader.php');
+  $reader = new FaceTagMetadataReader();
+  $metadata = $reader->readAll($image_path);
+  
+  error_log('=== getFaces Web Service ===');
+  error_log('Faces trouvées: ' . (isset($metadata['xmp']['faces']) ? count($metadata['xmp']['faces']) : 0));
+  
+  // Retourner les faces au format JSON
+  return array(
+    'image_id' => $params['image_id'],
+    'orientation' => isset($metadata['orientation']) ? $metadata['orientation'] : 1,
+    'faces' => isset($metadata['xmp']['faces']) ? $metadata['xmp']['faces'] : array()
+  );
+}
+
 
 //-------------------------------------------------------------------------------
 /// Effacement du fichier de log quand on clique sur taguer

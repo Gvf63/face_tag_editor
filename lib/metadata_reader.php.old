@@ -21,18 +21,22 @@ class FaceTagMetadataReader
         'xmp_raw' => ''
       );
       
-      // Lire XMP brut
+      
+
+      
+      // Lire XMP brut - AVEC GESTION D'ERREUR
       try {
         $xmp_profile = $imagick->getImageProfile('xmp');
       } catch (Exception $e) {
         $xmp_profile = false;
-        error_log('INFO: Aucun profil XMP dans image');
+        error_log('INFO: Aucun profil XMP dans image (normal pour certaines photos)');
       }
       
       if ($xmp_profile) {
         error_log('Reader - XMP brut trouve, longueur: ' . strlen($xmp_profile) . ' octets');
+        //error_log('Reader - XMP preview: ' . substr($xmp_profile, 0, 800)); // ------------------- affichage du xmp preview
         $metadata['xmp_raw'] = $xmp_profile;
-        $metadata['xmp'] = $this->parseXmp($xmp_profile, $image_path);
+        $metadata['xmp'] = $this->parseXmp($xmp_profile);
       } else {
         error_log('INFO: Pas de XMP a parser');
       }
@@ -59,7 +63,7 @@ class FaceTagMetadataReader
     }
   }
   
-  private function parseXmp($xmp_raw, $image_path)
+  private function parseXmp($xmp_raw)
   {
     $data = array(
       'subjects' => array(),
@@ -79,6 +83,8 @@ class FaceTagMetadataReader
     $xpath->registerNamespace('dc', 'http://purl.org/dc/elements/1.1/');
     $xpath->registerNamespace('lr', 'http://ns.adobe.com/lightroom/1.0/');
     $xpath->registerNamespace('digiKam', 'http://www.digikam.org/ns/1.0/');
+    $xpath->registerNamespace('mwg-rs', 'http://www.metadataworkinggroup.com/schemas/regions/');
+    $xpath->registerNamespace('stArea', 'http://ns.adobe.com/xmp/sType/Area#');
     
     // dc:subject
     $subjects = $xpath->query('//dc:subject/rdf:Bag/rdf:li');
@@ -94,28 +100,56 @@ class FaceTagMetadataReader
       $data['hierarchical_subjects'][] = $h->nodeValue;
     }
     
-    // digiKam:TagsList
+    // digiKam:TagsList (peut etre Bag OU Seq)
     $tags = $xpath->query('//digiKam:TagsList/rdf:Bag/rdf:li | //digiKam:TagsList/rdf:Seq/rdf:li');
     error_log('parseXmp - TagsList trouves: ' . $tags->length);
     foreach ($tags as $tag) {
       $data['tags_list'][] = $tag->nodeValue;
     }
     
-    // digiKam:CatalogSets
+    // digiKam:CatalogSets (peut etre Bag OU Seq)
     $catalog = $xpath->query('//digiKam:CatalogSets/rdf:Bag/rdf:li | //digiKam:CatalogSets/rdf:Seq/rdf:li');
     error_log('parseXmp - CatalogSets trouves: ' . $catalog->length);
     foreach ($catalog as $cat) {
       $data['catalog_sets'][] = $cat->nodeValue;
     }
     
-    // === FACES : fonction de editor_xmp_ex (version 2 de face_tag )
-    if (function_exists('facetag_editor_faces')) {
-      error_log('Utilisation de facetag_editor_faces() pour les faces');
-      $faces_data = facetag_editor_faces($image_path);
-      $data['faces'] = $faces_data['faces'];
-      error_log('parseXmp - Faces trouvees via xmp_extraction: ' . count($data['faces']));
-    } else {
-      error_log('ERREUR: facetag_editor_faces() non disponible !');
+    // Faces avec coordonnées complètes
+    $faceRegions = $xpath->query('//mwg-rs:RegionList/rdf:Bag/rdf:li');
+    error_log('parseXmp - Face regions trouvees: ' . $faceRegions->length);
+
+    foreach ($faceRegions as $region) {
+      // Vérifier que c'est bien un visage
+      $typeNodes = $xpath->query('mwg-rs:Type', $region);
+      $type = ($typeNodes->length > 0) ? $typeNodes->item(0)->nodeValue : '';
+      
+      if ($type !== 'Face') {
+        continue; // Ignorer les régions qui ne sont pas des visages
+      }
+      
+      // Lire le nom
+      $nameNodes = $xpath->query('mwg-rs:Name', $region);
+      $name = ($nameNodes->length > 0) ? $nameNodes->item(0)->nodeValue : '';
+      
+      // Lire les coordonnées de l'Area
+      $xNodes = $xpath->query('.//stArea:x', $region);
+      $yNodes = $xpath->query('.//stArea:y', $region);
+      $wNodes = $xpath->query('.//stArea:w', $region);
+      $hNodes = $xpath->query('.//stArea:h', $region);
+      
+      if ($xNodes->length > 0 && $yNodes->length > 0 && 
+          $wNodes->length > 0 && $hNodes->length > 0) {
+        
+        $data['faces'][] = array(
+          'name' => $name,
+          'x' => (float)$xNodes->item(0)->nodeValue,
+          'y' => (float)$yNodes->item(0)->nodeValue,
+          'w' => (float)$wNodes->item(0)->nodeValue,
+          'h' => (float)$hNodes->item(0)->nodeValue
+        );
+        
+        error_log("Face trouvee: $name at x=" . $xNodes->item(0)->nodeValue);
+      }
     }
 
     return $data;
@@ -125,10 +159,12 @@ class FaceTagMetadataReader
   {
     $non_face = array();
     
+    // Keywords IPTC
     if (isset($metadata['iptc']['Keywords'])) {
       $iptc_keywords = is_array($metadata['iptc']['Keywords']) ? 
         $metadata['iptc']['Keywords'] : array($metadata['iptc']['Keywords']);
       
+      // Extraire juste les noms des faces
       $face_names = array();
       if (isset($metadata['xmp']['faces'])) {
         foreach ($metadata['xmp']['faces'] as $face) {
@@ -153,6 +189,7 @@ class FaceTagMetadataReader
     $non_face = array();
     
     if (isset($metadata['xmp']['subjects'])) {
+      // Extraire juste les noms des faces
       $face_names = array();
       if (isset($metadata['xmp']['faces'])) {
         foreach ($metadata['xmp']['faces'] as $face) {
