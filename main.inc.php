@@ -1,7 +1,7 @@
 <?php
 /*
 Plugin Name: face_tag_editor
-Version: 1.9C
+Version: 2.0a
 Description: Créer et enregistrer les tags de visages dans les métadonnées XMP et description 
 Plugin URI: https://piwigo.org/ext/extension_view.php?eid=1053
 Author: Charles69
@@ -10,7 +10,22 @@ Has Settings: webmaster
 
 //============= VERSIONS ============================================
 /*
-version 1.9C en cours  16/12/2025
+version 2.0a  en cours
+    corrigé décalage texte sur jpg exporté
+    corrigé changement de langue aléatoire
+
+version 2.0 - 18/12/2025
+    PHP IMagick ou External ImageMagick requis - fonctionnement sans exiftool 
+    ajouté création image avec visages tagués
+    corrigé orientation 270CW
+    commentaire sur consol.log et error_log
+    commentaire sur les alertes débug
+    méthode traduction modifée 
+
+version 1.9D
+    ajout download photo taguée
+
+version 1.9C   16/12/2025
     suite à régression de fonctionnalités avec External Imagick seul
     fonctionnement sans exiftool 
     corrigé orientation 270CW
@@ -111,7 +126,7 @@ define('FACETAGWRITE_ID', basename(dirname(__FILE__)));
 define('FACETAGWRITE_PATH', PHPWG_PLUGINS_PATH . FACETAGWRITE_ID . '/');
 define('FACETAGWRITE_ADMIN', get_root_url() . 'admin.php?page=plugin-' . FACETAGWRITE_ID); // admin.php?page=plugin-face_tag_editor
 
-// Logs
+// Logs -------------------------------------- V2.0
 error_reporting(E_ALL);
 ini_set('display_errors', 0);
 ini_set('log_errors', 1);
@@ -173,65 +188,6 @@ function face_tag_write_load_scripts()
   $template->append('footer_elements', '
   <script src="' . FACETAGWRITE_PATH . 'template/draw_faces.js"></script>
   ');
-}
-
-//===================== TRADUCTION DE l'EDITEUR =================
-
-add_event_handler('loc_begin_page_header', 'face_tag_editor_load_translations');
-
-function face_tag_editor_load_translations()
-{
-  global $template;
-  
-  load_language('plugin.lang', FACETAGWRITE_PATH);
-  
-  // Injecter directement les traductions en JavaScript
-  $js_translations = "
-<script type=\"text/javascript\">
-var facetagLang = {
-  'Éditeur de visages': '" . l10n('Éditeur de visages') . "',
-  'Image': '" . l10n('Image') . "',
-  'Instructions :': '" . l10n('Instructions :') . "',
-  'Cliquez et faites glisser sur l\'image pour dessiner un rectangle autour d\'un visage. Double-cliquez sur un cadre pour renommer un visage': '" . l10n('Cliquez et faites glisser sur l\'image pour dessiner un rectangle autour d\'un visage. Double-cliquez sur un cadre pour renommer un visage') . "',
-  'Visages tagués': '" . l10n('Visages tagués') . "',
-  'Aucun visage tagué': '" . l10n('Aucun visage tagué') . "',
-  'Tout effacer': '" . l10n('Tout effacer') . "',
-  'Restaurer l\'original': '" . l10n('Restaurer l\'original') . "',
-  'Restaurer le fichier .original (supprime tous les tags)': '" . l10n('Restaurer le fichier .original (supprime tous les tags)') . "',
-  'Description...': '" . l10n('Description...') . "',
-  'Annuler': '" . l10n('Annuler') . "',
-  'Enregistrer': '" . l10n('Enregistrer') . "',
-  'existant': '" . l10n('existant') . "',
-  'Supprimer': '" . l10n('Supprimer') . "',
-  'Nommer la personne': '" . l10n('Nommer la personne') . "',
-  'Nom de la personne': '" . l10n('Nom de la personne') . "',
-  'Personnes existantes :': '" . l10n('Personnes existantes :') . "',
-  'Valider': '" . l10n('Valider') . "',
-  'Veuillez entrer un nom': '" . l10n('Veuillez entrer un nom') . "',
-  'Renommer la personne': '" . l10n('Renommer la personne') . "',
-  'Ancien nom :': '" . l10n('Ancien nom :') . "',
-  'Nouveau nom': '" . l10n('Nouveau nom') . "',
-  'Autres personnes :': '" . l10n('Autres personnes :') . "',
-  'Renommer': '" . l10n('Renommer') . "',
-  
-'Aucun visage à effacer': '" . l10n('Aucun visage à effacer') . "',
-'✅ Fichier original restauré avec succès !': '" . l10n('✅ Fichier original restauré avec succès !') . "',
-'❌ Aucun fichier .original trouvé à restaurer.\\n\\nLe fichier original n\'existe que si vous avez déjà enregistré des tags.': '" . l10n('❌ Aucun fichier .original trouvé à restaurer.\\n\\nLe fichier original n\'existe que si vous avez déjà enregistré des tags.') . "',
-'❌ Accès refusé. Vous n\'avez pas les permissions nécessaires.': '" . l10n('❌ Accès refusé. Vous n\'avez pas les permissions nécessaires.') . "',
-'Voulez-vous vraiment supprimer tous les tags de visages de cette image ?': '" . l10n('Voulez-vous vraiment supprimer tous les tags de visages de cette image ?') . "',
-'Êtes-vous sûr de vouloir effacer tous les rectangles ?': '" . l10n('Êtes-vous sûr de vouloir effacer tous les rectangles ?') . "',
-'⚠️ ATTENTION ⚠️\\n\\nCette action va :\\n• Restaurer le fichier .original \\n• Régénérer les miniatures\\n\\nÊtes-vous sûr de vouloir continuer ?': '" . l10n('⚠️ ATTENTION ⚠️\\n\\nCette action va :\\n• Restaurer le fichier .original \\n• Régénérer les miniatures\\n\\nÊtes-vous sûr de vouloir continuer ?') . "',
-
-'✅ Visages enregistrés avec succès !': '" . l10n('✅ Visages enregistrés avec succès !') . "',
-'Visages: ': '" . l10n('Visages: ') . "',
-'Backup créé: Oui (.original)': '" . l10n('Backup créé: Oui (.original)') . "',
-'Backup: Déjà existant': '" . l10n('Backup: Déjà existant') . "',
-
-};
-</script>
-";
-  
-  $template->append('head_elements', $js_translations);
 }
 
 // ==================== AJOUTER LE BOUTON ====================
@@ -351,6 +307,7 @@ function face_tag_write_ws_methods($arr)
 {
   $service = &$arr[0];
 
+  //-------------------------------
   $service->addMethod(
   'facetagwrite.clearLog',
   'face_tag_write_clear_log',
@@ -418,13 +375,13 @@ function face_tag_write_get_xmp($params, &$service)
   $old_display_errors = ini_get('display_errors');
   ini_set('display_errors', '0');
 
-  error_log('**** DEBUT LOG ****');
+  //*error_log('**** DEBUT LOG ****');
   
-  error_log('1 (333) Image ID -> ' . $params['image_id']);
+  //*error_log('1 (333) Image ID -> ' . $params['image_id']);
   
   if (empty($params['image_id']))
   {
-    error_log('ERROR (337) : Missing image_id');
+    //*error_log('ERROR (337) : Missing image_id');
     error_reporting($old_error_reporting);
     ini_set('display_errors', $old_display_errors);
     return new PwgError(WS_ERR_INVALID_PARAM, 'Missing image_id');
@@ -464,8 +421,8 @@ function face_tag_write_get_xmp($params, &$service)
     return new PwgError(404, 'File not found at resolved path');
   }
 
-  error_log('=== GET XMP ===');
-  error_log('2 (378) Fichier local -> ' . $real_local_path);
+  //*error_log('=== GET XMP ===');
+  //*error_log('2 (378) Fichier local -> ' . $real_local_path);
 
   // Créer un fichier temporaire
   $temp_dir = PHPWG_ROOT_PATH . '_data/tmp';
@@ -475,7 +432,7 @@ function face_tag_write_get_xmp($params, &$service)
       error_log("Créer un repertoire tmp, ./_data/tmp avec des droits en écriture");
     }
   } else {
-    error_log("3 - le rep ./_data/tmp existe");
+    //*error_log("3 - le rep ./_data/tmp existe");
   }
 
 
@@ -484,34 +441,34 @@ function face_tag_write_get_xmp($params, &$service)
   // Lire le fichier local directement (pas de allow_url_fopen nécessaire)
   $image_content = @file_get_contents($real_local_path);
   if ($image_content === false) {
-    error_log('ERROR: file_get_contents du fichier local FAILED');
+    //*error_log('ERROR: file_get_contents du fichier local FAILED');
     $last_error = error_get_last();
     if ($last_error) {
-      error_log('ERROR: PHP error = ' . $last_error['message']);
+      //*error_log('ERROR: PHP error = ' . $last_error['message']);
     }
     error_reporting($old_error_reporting);
     ini_set('display_errors', $old_display_errors);
     return new PwgError(500, 'Cannot read image file');
   }
 
-  error_log('STEP2B: file_get_contents SUCCESS, size = ' . strlen($image_content) . ' bytes');
+  //*error_log('STEP2B: file_get_contents SUCCESS, size = ' . strlen($image_content) . ' bytes');
 
   @file_put_contents($temp_file, $image_content);
   //error_log('STEP3: Temp file size = ' . filesize($temp_file) . ' octets');
-  error_log('Temp file size = ' . filesize($temp_file) . ' octets');
+  //*error_log('Temp file size = ' . filesize($temp_file) . ' octets');
 
   // Try to extract XMP using wrapper (with fallback to external ImageMagick)
   if (function_exists('facetag_extract_xmp')) {
     //error_log('STEP4: Using facetag_extract_xmp');
     $xmp_data = facetag_extract_xmp($temp_file);
   } else {
-    error_log('STEP4: Using face_tag_write_extract_xmp');
+    //*error_log('STEP4: Using face_tag_write_extract_xmp');
     $xmp_data = face_tag_write_extract_xmp($temp_file);
   }
 
   // Check if extraction had an error
   if (isset($xmp_data['error'])) {
-    error_log('ERROR: XMP extraction failed - ' . $xmp_data['error']);
+    //*error_log('ERROR: XMP extraction failed - ' . $xmp_data['error']);
     @unlink($temp_file);
     error_reporting($old_error_reporting);
     ini_set('display_errors', $old_display_errors);
@@ -536,7 +493,7 @@ function face_tag_write_get_xmp($params, &$service)
       //error_log('STEP5: No orientation found, using 1'); 
     }
   }else{
-    error_log('ERROR: exif_read_data not available'); 
+    //*error_log('ERROR: exif_read_data not available'); 
   }
   
   // Nettoyer
@@ -554,7 +511,7 @@ function face_tag_write_get_xmp($params, &$service)
   
   $faces = isset($metadata['xmp']['faces']) ? $metadata['xmp']['faces'] : array();
   
-  error_log('Faces parsées côté serveur: ' . count($faces));
+  //*error_log('Faces parsées côté serveur: ' . count($faces));
   
   // Ajouter les faces au XMP
   if (!isset($xmp_data['faces'])) {
@@ -627,7 +584,7 @@ function face_tag_write_save_xmp($params, &$service)
   $old_display_errors = ini_get('display_errors');
   ini_set('display_errors', '0');
   
-  error_log('=== SAVE XMP REQUEST ===');
+  //*error_log('=== SAVE XMP REQUEST ===');
 
 // Nettoyer les anciens fichiers temporaires (>1h)
 $temp_dir = PHPWG_ROOT_PATH . '_data/tmp';
@@ -640,9 +597,6 @@ if (is_dir($temp_dir)) {
     }
   }
 }
-
-
-
 
   
   if (empty($params['image_id']))
@@ -666,11 +620,11 @@ if (is_dir($temp_dir)) {
 $description = isset($params['description']) ? stripslashes(trim($params['description'])) : null;
 if ($description === '') {
   $description = null;
-  error_log('Description vide - sera supprimée');
+  //*error_log('Description vide - sera supprimée');
 } else if ($description !== null) {
-  error_log('Description reçue: ' . strlen($description) . ' caractères');
+  //*error_log('Description reçue: ' . strlen($description) . ' caractères');
 } else {
-  error_log('Description non fournie (null)');
+  //*error_log('Description non fournie (null)');
 }
   
  $faces_json = $params['faces'];
@@ -695,10 +649,10 @@ if ($description === '') {
   
   // Permettre tableau vide pour supprimer tous les tags
   if (count($faces) === 0) {
-    error_log('-> Suppression de tous les visages (tableau vide)');
+    //*error_log('-> Suppression de tous les visages (tableau vide)');
   }
   
-  error_log('-> ' . count($faces) . ' visages à  enregistrer');
+  //*error_log('-> ' . count($faces) . ' visages à  enregistrer');
   
   $query = '
   SELECT path
@@ -718,20 +672,20 @@ if ($description === '') {
   // Construire le chemin local et le résoudre (gère les liens symboliques)
   $real_local_path = face_tag_write_resolve_path($row['path']);
 
-  error_log('Fichier local: ' . $real_local_path);
+  //*error_log('Fichier local: ' . $real_local_path);
 
   if ($real_local_path === false) {
-    error_log('❌ Impossible de résoudre le chemin du fichier');
+    //*error_log('❌ Impossible de résoudre le chemin du fichier');
     error_reporting($old_error_reporting);
     ini_set('display_errors', $old_display_errors);
     return new PwgError(500, 'Cannot resolve file path');
   }
 
-  error_log('Chemin local résolu: ' . $real_local_path);
+  //*error_log('Chemin local résolu: ' . $real_local_path);
 
   // Vérifier que le fichier existe et est accessible
   if (!file_exists($real_local_path)) {
-    error_log('❌ Le fichier n\'existe pas: ' . $real_local_path);
+    //*error_log('❌ Le fichier n\'existe pas: ' . $real_local_path);
     error_reporting($old_error_reporting);
     ini_set('display_errors', $old_display_errors);
     return new PwgError(404, 'File not found at resolved path');
@@ -739,7 +693,7 @@ if ($description === '') {
 
   // Vérifier les permissions en lecture
   if (!is_readable($real_local_path)) {
-    error_log('❌ Le fichier n\'est pas lisible');
+    //*error_log('❌ Le fichier n\'est pas lisible');
     error_reporting($old_error_reporting);
     ini_set('display_errors', $old_display_errors);
     return new PwgError(403, 'File is not readable');
@@ -750,7 +704,7 @@ if ($description === '') {
   if (!is_dir($temp_dir)) {
     mkdir($temp_dir, 0755, true);
     if (!is_dir($temp_dir)) {
-      error_log('⚠️ Impossible de créer le répertoire temporaire');
+      //*error_log('⚠️ Impossible de créer le répertoire temporaire');
       error_reporting($old_error_reporting);
       ini_set('display_errors', $old_display_errors);
       return new PwgError(500, 'Cannot create temporary directory');
@@ -763,7 +717,7 @@ if ($description === '') {
 
   // Copier le fichier original vers le fichier temporaire (pour écriture)
   if (!@copy($real_local_path, $temp_file)) {
-    error_log('❌ Impossible de copier le fichier vers le fichier temporaire');
+    //*error_log('❌ Impossible de copier le fichier vers le fichier temporaire');
     error_reporting($old_error_reporting);
     ini_set('display_errors', $old_display_errors);
     return new PwgError(500, 'Cannot copy file to temporary location');
@@ -771,14 +725,14 @@ if ($description === '') {
 
   // Copier aussi pour lecture des métadonnées
   if (!@copy($real_local_path, $temp_for_reading)) {
-    error_log('❌ Impossible de copier le fichier pour la lecture des métadonnées');
+    //*error_log('❌ Impossible de copier le fichier pour la lecture des métadonnées');
     @unlink($temp_file);
     error_reporting($old_error_reporting);
     ini_set('display_errors', $old_display_errors);
     return new PwgError(500, 'Cannot copy file for metadata reading');
   }
   
-  error_log('Fichier pour lecture métadonnées: ' . $temp_for_reading);
+  //*error_log('Fichier pour lecture métadonnées: ' . $temp_for_reading);
   
   // Créer backup
   $backup_path = $real_local_path . '.original';
@@ -788,16 +742,16 @@ if ($description === '') {
     if (@copy($real_local_path, $backup_path)) {
       @chmod($backup_path, 0444);
       $backup_created = true;
-      error_log('Backup créé');
+      //*error_log('Backup créé');
     }
   } else {
-    error_log('Backup existe déjà');
+    //*error_log('Backup existe déjà');
   }
   
   // IMPORTANT : Toujours rendre le fichier writable avant modification
   // (car il peut avoir été mis en 0644 lors d'une précédente sauvegarde)
   @chmod($real_local_path, 0666);
-  error_log('Permissions du fichier mises à 0666 pour permettre l\'écriture');
+  //*error_log('Permissions du fichier mises à 0666 pour permettre l\'écriture');
   
 // ✅ AJOUTER CE LOG
 //$perms = fileperms($real_local_path);
@@ -810,7 +764,7 @@ if ($description === '') {
   
   // Fusionner métadonnées (on passe le fichier de lecture pour lire les métadonnées existantes)
   $merged_data = $merger->merge($temp_for_reading, $faces);
-  error_log('Métadonnées fusionnées');
+  //*error_log('Métadonnées fusionnées');
   
   // Nettoyer le fichier de lecture
   @unlink($temp_for_reading);
@@ -819,7 +773,7 @@ if ($description === '') {
   try {
     $result = $writer->writeMetadata($temp_file, $faces, $merged_data, $description);
   } catch (Exception $e) {
-    error_log('Exception: ' . $e->getMessage());
+    //*error_log('Exception: ' . $e->getMessage());
     @unlink($temp_file);
     error_reporting($old_error_reporting);
     ini_set('display_errors', $old_display_errors);
@@ -828,37 +782,37 @@ if ($description === '') {
   
   if ($result['success'])
   {
-    error_log(' XMP écrit sur fichier temporaire');
+    //*error_log(' XMP écrit sur fichier temporaire');
     
     // Essayer d'écrire sur le chemin résolu
-    error_log('>> main.inc.php');
-    error_log('Tentative copie vers: ' . $real_local_path);
-    error_log('Fichier existe: ' . (file_exists($real_local_path) ? 'OUI' : 'NON'));
-    error_log('Writable: ' . (is_writable($real_local_path) ? 'OUI' : 'NON'));
+    //*error_log('>> main.inc.php');
+    //*error_log('Tentative copie vers: ' . $real_local_path);
+    //*error_log('Fichier existe: ' . (file_exists($real_local_path) ? 'OUI' : 'NON'));
+    //*error_log('Writable: ' . (is_writable($real_local_path) ? 'OUI' : 'NON'));
     
     if (@copy($temp_file, $real_local_path)) {
-      error_log('Fichier copié vers: ' . $real_local_path);
+      //*error_log('Fichier copié vers: ' . $real_local_path);
       @chmod($real_local_path, 0644);
       // Forcer le vidage du cache PHP et système
       clearstatcache(true, $real_local_path);
       // Mettre à jour la date de modification pour forcer le rechargement
       @touch($real_local_path);
-      error_log('Cache vidé et date de modification mise à jour');
+      //*error_log('Cache vidé et date de modification mise à jour');
     } else {
-      error_log('Échec copie - Dernière tentative: écriture directe');
+      //*error_log('Échec copie - Dernière tentative: écriture directe');
 
       // Dernière tentative : lire le temp et écrire directement
       $content = file_get_contents($temp_file);
       if (@file_put_contents($real_local_path, $content) !== false) {
-        error_log('Écriture directe réussie');
+        //*error_log('Écriture directe réussie');
         @chmod($real_local_path, 0644);
         // Forcer le vidage du cache PHP et système
         clearstatcache(true, $real_local_path);
         // Mettre à jour la date de modification pour forcer le rechargement
         @touch($real_local_path);
-        error_log('Cache vidé et date de modification mise à jour');
+        //*error_log('Cache vidé et date de modification mise à jour');
       } else {
-        error_log('Toutes les méthodes ont échoué');
+        //*error_log('Toutes les méthodes ont échoué');
         @unlink($temp_file);
         error_reporting($old_error_reporting);
         ini_set('display_errors', $old_display_errors);
@@ -873,9 +827,9 @@ if ($description === '') {
     
     try {
       face_tag_write_regenerate_metadata($params['image_id'], count($faces) > 0, strlen($description) > 0);
-      error_log(' Métadata synchronisées');
+      //*error_log(' Métadata synchronisées');
     } catch (Exception $e) {
-      error_log('Erreur synchro metadonnées: ' . $e->getMessage());
+      //*error_log('Erreur synchro metadonnées: ' . $e->getMessage());
     }
     
     
@@ -892,7 +846,7 @@ if ($description === '') {
     // Propager le warning si exiftool manque
     if (isset($result['warning'])) {
       $response['warning'] = $result['warning'];
-      error_log('⚠ Warning propagé au client: ' . $result['warning']);
+      //*error_log('⚠ Warning propagé au client: ' . $result['warning']);
     }
     
     return $response;
@@ -900,7 +854,7 @@ if ($description === '') {
   }
   else
   {
-    error_log(' Échec écriture XMP: ' . $result['error']);
+    //*error_log(' Échec écriture XMP: ' . $result['error']);
     @unlink($temp_file);
     error_reporting($old_error_reporting);
     ini_set('display_errors', $old_display_errors);
@@ -923,21 +877,21 @@ function face_tag_write_regenerate_metadata($image_id, $has_faces = true, $has_d
 
   // Si plus de visages, supprimer tous les tags de l'image
   if (!$has_faces) {
-    error_log('Suppression des tags Piwigo (plus de visages)');
+    //*error_log('Suppression des tags Piwigo (plus de visages)');
     $query = 'DELETE FROM ' . IMAGE_TAG_TABLE . ' WHERE image_id = ' . intval($image_id);
     pwg_query($query);
   }
 
   // Si plus de description, la supprimer
   if (!$has_description) {
-    error_log('Suppression de la description Piwigo');
+    //*error_log('Suppression de la description Piwigo');
     $query = 'UPDATE ' . IMAGES_TABLE . ' SET comment = NULL WHERE id = ' . intval($image_id);
     pwg_query($query);
   }
 
     sync_metadata(array($image_id));
     invalidate_user_cache();
-    error_log('✓ Métadonnées Piwigo synchronisées pour image ' . $image_id);
+    //*error_log('✓ Métadonnées Piwigo synchronisées pour image ' . $image_id);
   
  return true;
 }
@@ -976,8 +930,8 @@ WHERE id = ' . intval($params['image_id']);
   $reader = new FaceTagMetadataReader();
   $metadata = $reader->readAll($image_path);
   
-  error_log('=== getFaces Web Service ===');
-  error_log('Faces trouvées: ' . (isset($metadata['xmp']['faces']) ? count($metadata['xmp']['faces']) : 0));
+  //*error_log('=== getFaces Web Service ===');
+  //*error_log('Faces trouvées: ' . (isset($metadata['xmp']['faces']) ? count($metadata['xmp']['faces']) : 0));
   
   // Retourner les faces au format JSON
   return array(
@@ -988,25 +942,72 @@ WHERE id = ' . intval($params['image_id']);
 }
 
 
-//-------------------------------------------------------------------------------
-/// Effacement du fichier de log quand on clique sur taguer
 
-function face_tag_write_clear_log($params, &$service)
+
+// ==================== INJECTION CONDITIONNELLE DES TRADUCTIONS ====================
+add_event_handler('loc_begin_page_header', 'face_tag_editor_inject_translations_conditionally');
+
+function face_tag_editor_inject_translations_conditionally()
 {
-  // Vérifier les droits d'accès
-  if (!face_tag_write_check_access())
-  {
-    return new PwgError(403, 'Access denied');
+  global $template, $page;
+  
+  // Injecter UNIQUEMENT sur les pages photo (picture.php)
+  if (!isset($page['image_id'])) {
+    return; // Pas une page photo, on sort
   }
   
-  $log_file = FACETAGWRITE_PATH . 'face_tag_editor_debug.log';
-  if (file_exists($log_file)) {
-    @unlink($log_file);
-  }
+  // Charger les traductions
+  load_language('plugin.lang', FACETAGWRITE_PATH);
   
-  error_log('=== NOUVEAU TRAITEMENT  ===');
+  // Créer le tableau JavaScript
+  $translations = array(
+    'Éditeur de visages' => l10n('Éditeur de visages'),
+    'Image' => l10n('Image'),
+    'Instructions :' => l10n('Instructions :'),
+    'Cliquez et faites glisser sur l\'image pour dessiner un rectangle autour d\'un visage. Double-cliquez sur un cadre pour renommer un visage' => l10n('Cliquez et faites glisser sur l\'image pour dessiner un rectangle autour d\'un visage. Double-cliquez sur un cadre pour renommer un visage'),
+    'Visages tagués' => l10n('Visages tagués'),
+    'Aucun visage tagué' => l10n('Aucun visage tagué'),
+    'Tout effacer' => l10n('Tout effacer'),
+    'Restaurer l\'original' => l10n('Restaurer l\'original'),
+    'Restaurer le fichier .original (supprime tous les tags)' => l10n('Restaurer le fichier .original (supprime tous les tags)'),
+    'Description...' => l10n('Description...'),
+    'Annuler' => l10n('Annuler'),
+    'Enregistrer' => l10n('Enregistrer'),
+    'existant' => l10n('existant'),
+    'Supprimer' => l10n('Supprimer'),
+    'Nommer la personne' => l10n('Nommer la personne'),
+    'Nom de la personne' => l10n('Nom de la personne'),
+    'Personnes existantes :' => l10n('Personnes existantes :'),
+    'Valider' => l10n('Valider'),
+    'Veuillez entrer un nom' => l10n('Veuillez entrer un nom'),
+    'Renommer la personne' => l10n('Renommer la personne'),
+    'Ancien nom :' => l10n('Ancien nom :'),
+    'Nouveau nom' => l10n('Nouveau nom'),
+    'Autres personnes :' => l10n('Autres personnes :'),
+    'Renommer' => l10n('Renommer'),
+    'Taguer' => l10n('Taguer'),
+    'Taguer les visages' => l10n('Taguer les visages'),
+    'Aucun visage à effacer' => l10n('Aucun visage à effacer'),
+    '✅ Fichier original restauré avec succès !' => l10n('✅ Fichier original restauré avec succès !'),
+    '❌ Aucun fichier .original trouvé à restaurer.\n\nLe fichier original n\'existe que si vous avez déjà enregistré des tags.' => l10n('❌ Aucun fichier .original trouvé à restaurer.\n\nLe fichier original n\'existe que si vous avez déjà enregistré des tags.'),
+    '❌ Accès refusé. Vous n\'avez pas les permissions nécessaires.' => l10n('❌ Accès refusé. Vous n\'avez pas les permissions nécessaires.'),
+    '✅ Visages enregistrés avec succès !' => l10n('✅ Visages enregistrés avec succès !'),
+    'Visages: ' => l10n('Visages: '),
+    'Backup créé: Oui (.original)' => l10n('Backup créé: Oui (.original)'),
+    'Backup: Déjà existant' => l10n('Backup: Déjà existant'),
+    'Voulez-vous vraiment supprimer tous les tags de visages de cette image ?' => l10n('Voulez-vous vraiment supprimer tous les tags de visages de cette image ?'),
+    'Êtes-vous sûr de vouloir effacer tous les rectangles ?' => l10n('Êtes-vous sûr de vouloir effacer tous les rectangles ?'),
+    '⚠️ ATTENTION ⚠️\n\nCette action va :\n• Restaurer le fichier .original \n• Régénérer les miniatures\n\nÊtes-vous sûr de vouloir continuer ?' => l10n('⚠️ ATTENTION ⚠️\n\nCette action va :\n• Restaurer le fichier .original \n• Régénérer les miniatures\n\nÊtes-vous sûr de vouloir continuer ?'),
+    'Télécharger JPG' => l10n('Télécharger JPG'),
+    'Télécharger l\'image avec les rectangles visibles' => l10n('Télécharger l\'image avec les rectangles visibles'),
+    'Aucun visage tagué à télécharger' => l10n('Aucun visage tagué à télécharger'),
+    'Erreur lors de la génération de l\'image' => l10n('Erreur lors de la génération de l\'image')
+  );
   
-  return array('stat' => 'ok', 'message' => 'Log cleared');
+  // Injecter en JavaScript avec json_encode (propre et sécurisé)
+  $js = '<script type="text/javascript">window.facetagLang = ' . json_encode($translations, JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) . ';</script>';
+  
+  $template->append('head_elements', $js);
 }
 
 

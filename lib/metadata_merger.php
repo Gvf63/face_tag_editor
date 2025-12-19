@@ -18,40 +18,40 @@ class FaceTagMetadataMerger
 
 
     // === DEBUG ===
-    error_log('=== MERGER DEBUG ===');
-    error_log('Faces actuelles: ' . (isset($current['xmp']['faces']) ? count($current['xmp']['faces']) : 0));
-    error_log('Nouvelles faces: ' . count($new_faces));
+    //*error_log('=== MERGER DEBUG ===');
+    //*error_log('Faces actuelles: ' . (isset($current['xmp']['faces']) ? count($current['xmp']['faces']) : 0));
+    //*error_log('Nouvelles faces: ' . count($new_faces));
     if (isset($current['xmp']['faces'])) {
         foreach ($current['xmp']['faces'] as $f) {
-            error_log('Face actuelle: ' . $f['name']);
+            //*error_log('Face actuelle: ' . $f['name']);
         }
     }
     foreach ($new_faces as $f) {
-        error_log('Nouvelle face: ' . $f['name']);
+        //*error_log('Nouvelle face: ' . $f['name']);
     }
     // === END DEBUG ===
 
 
-    error_log('=== DEBUG MERGER ===');
-    error_log('Current metadata keys: ' . implode(', ', array_keys($current)));
+    //*error_log('=== DEBUG MERGER ===');
+    //*error_log('Current metadata keys: ' . implode(', ', array_keys($current)));
     
     if (isset($current['xmp'])) {
-      error_log('XMP keys: ' . implode(', ', array_keys($current['xmp'])));
-      error_log('XMP subjects: ' . print_r($current['xmp']['subjects'], true));
-      error_log('XMP hierarchical_subjects: ' . print_r($current['xmp']['hierarchical_subjects'], true));
-      error_log('XMP tags_list: ' . print_r($current['xmp']['tags_list'], true));
-      error_log('XMP faces: ' . print_r($current['xmp']['faces'], true));
+      //*error_log('XMP keys: ' . implode(', ', array_keys($current['xmp'])));
+      //*error_log('XMP subjects: ' . print_r($current['xmp']['subjects'], true));
+      //*error_log('XMP hierarchical_subjects: ' . print_r($current['xmp']['hierarchical_subjects'], true));
+      //*error_log('XMP tags_list: ' . print_r($current['xmp']['tags_list'], true));
+      //*error_log('XMP faces: ' . print_r($current['xmp']['faces'], true));
     }
     
     if (isset($current['iptc'])) {
-      error_log('IPTC Keys: ' . implode(', ', array_keys($current['iptc'])));
+      //*error_log('IPTC Keys: ' . implode(', ', array_keys($current['iptc'])));
       if (isset($current['iptc']['Keywords'])) {
-        error_log('IPTC Keywords: ' . print_r($current['iptc']['Keywords'], true));
+        //*error_log('IPTC Keywords: ' . print_r($current['iptc']['Keywords'], true));
       }
     }
     
     if (isset($current['error'])) {
-      error_log('⚠ Erreur lecture métadonnées: ' . $current['error']);
+      //*error_log('⚠ Erreur lecture métadonnées: ' . $current['error']);
       return array(
         'person_names' => $this->extractPersonNames($new_faces),
         'non_face_keywords' => array(),
@@ -76,7 +76,7 @@ class FaceTagMetadataMerger
     
     // Si pas de subjects XMP, utiliser les keywords IPTC comme subjects
     if (empty($non_face_subjects) && !empty($non_face_keywords)) {
-      error_log('Pas de XMP subjects, utilisation des IPTC keywords comme base');
+      //*error_log('Pas de XMP subjects, utilisation des IPTC keywords comme base');
       $non_face_subjects = $non_face_keywords;
     }
     
@@ -89,11 +89,11 @@ class FaceTagMetadataMerger
     // Extraire les CatalogSets existants NON liés aux visages
     $non_face_catalogsets = $this->extractNonFaceCatalogSets($current);
     
-    error_log('Préexistant - Non-face keywords: ' . count($non_face_keywords));
-    error_log('Préexistant - Non-face subjects: ' . count($non_face_subjects));
-    error_log('Préexistant - Non-face hierarchical: ' . count($non_face_hierarchical));
-    error_log('Préexistant - Non-face tagslist: ' . count($non_face_tagslist));
-    error_log('Préexistant - Non-face catalogsets: ' . count($non_face_catalogsets));
+    //*error_log('Préexistant - Non-face keywords: ' . count($non_face_keywords));
+    //*error_log('Préexistant - Non-face subjects: ' . count($non_face_subjects));
+    //*error_log('Préexistant - Non-face hierarchical: ' . count($non_face_hierarchical));
+    //*error_log('Préexistant - Non-face tagslist: ' . count($non_face_tagslist));
+    //*error_log('Préexistant - Non-face catalogsets: ' . count($non_face_catalogsets));
     
     // Fusionner
     return array(

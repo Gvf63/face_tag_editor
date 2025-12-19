@@ -3,7 +3,6 @@
 // fenêtre modale
 // éditeur
 $lang['Éditeur de visages'] = 'Face Editor';
-$lang['Image'] = 'Image';
 $lang['Instructions :'] = 'Instructions:';
 $lang['Cliquez et faites glisser sur l\'image pour dessiner un rectangle autour d\'un visage. Double-cliquez sur un cadre pour renommer un visage'] = 'Click and drag on the image to draw a rectangle around a face. Double-click on a frame to rename a face';
 $lang['Visages tagués'] = 'Tagged faces';
@@ -52,6 +51,10 @@ $lang['Voulez-vous vraiment supprimer tous les tags de visages de cette image ?'
 $lang['Êtes-vous sûr de vouloir effacer tous les rectangles ?'] = 'Are you sure you want to clear all rectangles?';
 $lang['⚠️ ATTENTION ⚠️\n\nCette action va :\n• Restaurer le fichier .original \n• Régénérer les miniatures\n\nÊtes-vous sûr de vouloir continuer ?'] = '⚠️ WARNING ⚠️\n\nThis action will:\n• Restore the .original file\n• Regenerate thumbnails\n\nAre you sure you want to continue?';
 
-
+// fichier jpg tagué
+$lang['Télécharger JPG'] = 'Download JPG';
+$lang['Télécharger l\'image avec les rectangles visibles'] = 'Download image with visible rectangles';
+$lang['Aucun visage tagué à télécharger'] = 'No tagged faces to download';
+$lang['Erreur lors de la génération de l\'image'] = 'Error generating image';
 
 ?>

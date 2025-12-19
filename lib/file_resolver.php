@@ -15,11 +15,11 @@ function face_tag_write_resolve_path($path)
   $full_path = PHPWG_ROOT_PATH . $path;
   $full_path = str_replace('/./', '/', $full_path);
   
-  error_log('Résolution du chemin: ' . $full_path);
+  //*error_log('Résolution du chemin: ' . $full_path);
   
   // Verifier si c'est un lien symbolique
   if (is_link($full_path)) {
-    error_log('Lien symbolique détecté');
+    //*error_log('Lien symbolique détecté');
     $target = readlink($full_path);
     
     // Si le lien est relatif, le resoudre par rapport au repertoire contenant le lien
@@ -31,11 +31,11 @@ function face_tag_write_resolve_path($path)
     $target = realpath($target);
     
     if ($target === false) {
-      error_log('Impossible de résoudre le lien symbolique');
+      //*error_log('Impossible de résoudre le lien symbolique');
       return false;
     }
     
-    error_log('Lien résolu vers: ' . $target);
+    //*error_log('Lien résolu vers: ' . $target);
     return $target;
   }
   
@@ -43,11 +43,11 @@ function face_tag_write_resolve_path($path)
   $real = realpath($full_path);
   
   if ($real === false) {
-    error_log('realpath a échoué, utilisation du chemin original');
+    //*error_log('realpath a échoué, utilisation du chemin original');
     return $full_path;
   }
   
-  error_log('Chemin réel: ' . $real);
+  //*error_log('Chemin réel: ' . $real);
   return $real;
 }
 ?>

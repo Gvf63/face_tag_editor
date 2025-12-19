@@ -39,7 +39,7 @@ class FaceTagMetadataWriterSimple
   public function writeMetadata($image_path, $faces, $merged_data = null, $description = null)
   {
     try {
-      error_log('=== WRITER SIMPLE : Début ===');
+      //*error_log('=== WRITER SIMPLE : Début ===');
 
       // Use wrapper for fallback support
       $imagick = ImagickWrapper::load($image_path);
@@ -52,7 +52,7 @@ class FaceTagMetadataWriterSimple
       $image_width = $imagick->getImageWidth();
       $image_height = $imagick->getImageHeight();
       
-      error_log('Dimensions : ' . $image_width . 'x' . $image_height);
+      //*error_log('Dimensions : ' . $image_width . 'x' . $image_height);
       
       // Extraire noms des personnes
       $person_names = $this->extractPersonNames($faces);
@@ -88,12 +88,12 @@ class FaceTagMetadataWriterSimple
       $imagick->clear();
       $imagick->destroy();
       
-      error_log('=== WRITER SIMPLE : Succès ===');
+      //*error_log('=== WRITER SIMPLE : Succès ===');
       
       return array('success' => true);
       
     } catch (Exception $e) {
-      error_log('ERREUR : ' . $e->getMessage());
+      //*error_log('ERREUR : ' . $e->getMessage());
       return array('success' => false, 'error' => $e->getMessage());
     }
   }
@@ -104,32 +104,32 @@ class FaceTagMetadataWriterSimple
   private function buildXmpFromTemplate($faces, $width, $height, $subjects, $hierarchical, $tagslist, $catalogsets)
   {
     // Charger le template principal
-    error_log('📁 Template dir: ' . $this->template_dir);
-    error_log('📄 xmp_template.xml exists: ' . (file_exists($this->template_dir . 'xmp_template.xml') ? 'YES' : 'NO'));
+    //*error_log('📁 Template dir: ' . $this->template_dir);
+    //*error_log('📄 xmp_template.xml exists: ' . (file_exists($this->template_dir . 'xmp_template.xml') ? 'YES' : 'NO'));
     
     $template = @file_get_contents($this->template_dir . 'xmp_template.xml');
     if ($template === false) {
-      error_log('❌ ERREUR CRITIQUE: Impossible de charger xmp_template.xml');
-      error_log('Chemin complet: ' . realpath($this->template_dir));
+      //*error_log('❌ ERREUR CRITIQUE: Impossible de charger xmp_template.xml');
+      //*error_log('Chemin complet: ' . realpath($this->template_dir));
       throw new Exception('Template xmp_template.xml not found in ' . $this->template_dir);
     }
-    error_log('✅ Template principal chargé: ' . strlen($template) . ' bytes');
+    //*error_log('✅ Template principal chargé: ' . strlen($template) . ' bytes');
     
     // Template pour une face MPReg
     $mpreg_template = @file_get_contents($this->template_dir . 'face_mpreg_template.xml');
     if ($mpreg_template === false) {
-      error_log('❌ ERREUR: face_mpreg_template.xml introuvable');
+      //*error_log('❌ ERREUR: face_mpreg_template.xml introuvable');
       throw new Exception('Template face_mpreg_template.xml not found');
     }
-    error_log('✅ Template MPReg chargé');
+    //*error_log('✅ Template MPReg chargé');
     
     // Template pour une face MWG-RS
     $mwgrs_template = @file_get_contents($this->template_dir . 'face_mwgrs_template.xml');
     if ($mwgrs_template === false) {
-      error_log('❌ ERREUR: face_mwgrs_template.xml introuvable');
+      //*error_log('❌ ERREUR: face_mwgrs_template.xml introuvable');
       throw new Exception('Template face_mwgrs_template.xml not found');
     }
-    error_log('✅ Template MWG-RS chargé');
+    //*error_log('✅ Template MWG-RS chargé');
     
     // Générer les faces MPReg
     $mpreg_faces = '';
@@ -255,12 +255,12 @@ class FaceTagMetadataWriterSimple
  // Gérer la description (ajouter, modifier ou supprimer)
 if ($description !== null && strlen($description) > 0) {
   $iptc_data['2#120'] = $description;
-  error_log('IPTC Description ajoutée: ' . strlen($description) . ' caractères');
+  //*error_log('IPTC Description ajoutée: ' . strlen($description) . ' caractères');
 } else {
   // Supprimer la description si elle existe
   if (isset($iptc_data['2#120'])) {
     unset($iptc_data['2#120']);
-    error_log('IPTC Description supprimée');
+    //*error_log('IPTC Description supprimée');
   }
 }
 
@@ -274,7 +274,7 @@ if ($description !== null && strlen($description) > 0) {
     // Écrire en une seule fois
     $imagick->setImageProfile('iptc', $new_profile);
     
-    error_log('IPTC Keywords écrits : ' . count($keywords));
+    //*error_log('IPTC Keywords écrits : ' . count($keywords));
   }
   
   /**

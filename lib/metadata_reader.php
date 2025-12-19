@@ -26,15 +26,15 @@ class FaceTagMetadataReader
         $xmp_profile = $imagick->getImageProfile('xmp');
       } catch (Exception $e) {
         $xmp_profile = false;
-        error_log('INFO: Aucun profil XMP dans image');
+        //*error_log('INFO: Aucun profil XMP dans image');
       }
       
       if ($xmp_profile) {
-        error_log('Reader - XMP brut trouve, longueur: ' . strlen($xmp_profile) . ' octets');
+        //*error_log('Reader - XMP brut trouve, longueur: ' . strlen($xmp_profile) . ' octets');
         $metadata['xmp_raw'] = $xmp_profile;
         $metadata['xmp'] = $this->parseXmp($xmp_profile, $image_path);
       } else {
-        error_log('INFO: Pas de XMP a parser');
+        //*error_log('INFO: Pas de XMP a parser');
       }
       
       // Lire orientation EXIF
@@ -82,40 +82,40 @@ class FaceTagMetadataReader
     
     // dc:subject
     $subjects = $xpath->query('//dc:subject/rdf:Bag/rdf:li');
-    error_log('parseXmp - dc:subject trouves: ' . $subjects->length);
+    //*error_log('parseXmp - dc:subject trouves: ' . $subjects->length);
     foreach ($subjects as $subject) {
       $data['subjects'][] = $subject->nodeValue;
     }
     
     // lr:hierarchicalSubject
     $hier = $xpath->query('//lr:hierarchicalSubject/rdf:Bag/rdf:li');
-    error_log('parseXmp - hierarchicalSubject trouves: ' . $hier->length);
+    //*error_log('parseXmp - hierarchicalSubject trouves: ' . $hier->length);
     foreach ($hier as $h) {
       $data['hierarchical_subjects'][] = $h->nodeValue;
     }
     
     // digiKam:TagsList
     $tags = $xpath->query('//digiKam:TagsList/rdf:Bag/rdf:li | //digiKam:TagsList/rdf:Seq/rdf:li');
-    error_log('parseXmp - TagsList trouves: ' . $tags->length);
+    //*error_log('parseXmp - TagsList trouves: ' . $tags->length);
     foreach ($tags as $tag) {
       $data['tags_list'][] = $tag->nodeValue;
     }
     
     // digiKam:CatalogSets
     $catalog = $xpath->query('//digiKam:CatalogSets/rdf:Bag/rdf:li | //digiKam:CatalogSets/rdf:Seq/rdf:li');
-    error_log('parseXmp - CatalogSets trouves: ' . $catalog->length);
+    //*error_log('parseXmp - CatalogSets trouves: ' . $catalog->length);
     foreach ($catalog as $cat) {
       $data['catalog_sets'][] = $cat->nodeValue;
     }
     
     // === FACES : fonction de editor_xmp_ex (version 2 de face_tag )
     if (function_exists('facetag_editor_faces')) {
-      error_log('Utilisation de facetag_editor_faces() pour les faces');
+      //*error_log('Utilisation de facetag_editor_faces() pour les faces');
       $faces_data = facetag_editor_faces($image_path);
       $data['faces'] = $faces_data['faces'];
-      error_log('parseXmp - Faces trouvees via xmp_extraction: ' . count($data['faces']));
+      //*error_log('parseXmp - Faces trouvees via xmp_extraction: ' . count($data['faces']));
     } else {
-      error_log('ERREUR: facetag_editor_faces() non disponible !');
+      //*error_log('ERREUR: facetag_editor_faces() non disponible !');
     }
 
     return $data;
