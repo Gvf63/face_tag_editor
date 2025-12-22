@@ -98,10 +98,13 @@
             <li>déplacer, redimensionner un cadre de visage</li>
             <li>pour renommer double cliquer sur le cadre</li>
             <li>saisir/modifier la description de la photo</li>
+            <li>télécharger un photo avec les tags incrustés</li>
+
         </ul>
         
         <h3>Droits d'accès</h3>
         <p>Pour pouvoir utiliser le plugin il faut être webmaster, administrateur ou un user appartenant au groupe FaceTag.</p>
+        <p>Les droits des utilisateurs sont soit globaux, soit sur des albums à spécifier.</p>
         
         <h3>Visualisation des résultats</h3>
         <p>Pour visualiser les résultats il faut installer/activer le plugin face_tag : <a href="https://fr.piwigo.org/ext/index.php?eid=1051" target="_blank">https://fr.piwigo.org/ext/index.php?eid=1051</a></p>
@@ -139,6 +142,7 @@
         <h3>Sauvegarde et restauration</h3>
         <p>La 1ère fois qu'un enregistrement d'une édition de tag visage est faite, une copie de la photo <span class="code">xyz.jpg</span> est réalisée sous le nom <span class="code">xyz.jpg.original</span> (que ce soit en <span class="code">./galleries</span> ou en <span class="code">./upload</span>).</p>
         <p>Dans l'interface, un bouton <strong>"Restaurer"</strong> vous permet de revenir à la photo initiale.</p>
+        <p>Cette fonctionnalité peut être active ou inactive. La suppression sélective des .original est prévue.</p>
         
         <h3>Intégration Piwigo</h3>
         <p>Les tags sont ajoutés à la liste des tags Piwigo, et les miniatures sont mises à jour.</p>
@@ -154,12 +158,14 @@
         <ul>
             <li>create/delete face frames</li>
             <li>move and resize a face frame</li>
-            <li>To rename, double-click on the frame.</li>
-            <li>enter/edit the photo description.</li>
+            <li>To rename, double-click on the frame</li>
+            <li>enter/edit the photo description</li>
+            <li>upload a photo with embedded tags</li>
         </ul>
         
         <h3>Access Rights</h3>
         <p>To use the plugin, you must be a webmaster, administrator, or a user belonging to the FaceTag group.</p>
+        <p>User rights are either global or specific to particular albums.</p>
         
         <h3>Viewing Results</h3>
         <p>To view the results, you must install/activate the face_tag plugin: <a href="https://fr.piwigo.org/ext/index.php?eid=1051" target="_blank">https://fr.piwigo.org/ext/index.php?eid=1051</a></p>
@@ -197,6 +203,7 @@
         <h3>Backup and Restore</h3>
         <p>The first time a face tag edit is saved, a copy of the photo <span class="code">xyz.jpg</span> is created under the name <span class="code">xyz.jpg.original</span> (whether in <span class="code">./galleries</span> or <span class="code">./upload</span>).</p>
         <p>A <strong>"Restore"</strong> button in the interface allows you to revert to the original photo.</p>
+        <p>This feature can be enabled or disabled. Selective deletion of .original files is planned.</p>
         
         <h3>Piwigo Integration</h3>
         <p>The tags are added to the Piwigo tag list, and the thumbnails are updated.</p>

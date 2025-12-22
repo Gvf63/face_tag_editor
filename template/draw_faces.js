@@ -346,6 +346,12 @@ $('#facetag-description').val(description);
         formData.append('faces', JSON.stringify(facesData));
         var description = $('#facetag-description').val() || '';
         formData.append('description', description);    
+
+// ✅ AJOUTER LE PARAMÈTRE save_original ---------------------------------------------------- V2.1
+        var saveOriginal = window.faceTagConfig ? window.faceTagConfig.saveOriginal : true;
+        formData.append('save_original', saveOriginal);
+
+
         
       //console.log('Faces JSON avant envoi:', JSON.stringify(facesData));
       //console.log('Faces JSON bytes:', Array.from(JSON.stringify(facesData)).map(c => c.charCodeAt(0).toString(16).padStart(2, '0')).join(' '));

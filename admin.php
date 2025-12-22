@@ -1,22 +1,41 @@
 <?php
 defined('PHPWG_ROOT_PATH') or die('Hacking attempt!');
 
-// Inclure les fonctions communes avec chemin relatif
-include_once(dirname(__FILE__) . '/admin/functions.inc.php'); // fonction d'affichage des onglets
+//*error_log('DEBUG: admin.php chargé');
 
-// Récupérer la page demandée
-$page_name = isset($_GET['tab']) ? $_GET['tab'] : 'help'; /// définit l'onglet pré selectionné
+// Charger les fonctions
+include_once(FACETAGWRITE_PATH . 'admin/functions.inc.php');  // <-- Changer ici
 
-// Charger la page correspondante
-$page_path = FACETAGWRITE_PATH . 'admin/' . $page_name . '.php';
+//*error_log('DEBUG: functions_inc chargé');
 
-if (file_exists($page_path))
-{
-  include($page_path);
+// Déterminer l'onglet actif
+$page['tab'] = isset($_GET['tab']) ? $_GET['tab'] : 'help';
+
+//*error_log('DEBUG: tab = ' . $page['tab']);
+
+// Charger le contenu de l'onglet
+switch ($page['tab']) {
+    case 'help':
+        //*error_log('DEBUG: avant include help.php');
+        include(FACETAGWRITE_PATH . 'admin/help.php');
+        break;
+    
+    case 'manage_originals':
+        //*error_log('DEBUG: avant include manage_originals.php');
+        include(FACETAGWRITE_PATH . 'admin/manage_originals.php');
+        break;
+
+    case 'manage_rights':
+        //*error_log('DEBUG: avant include manage_rights.php');
+        include(FACETAGWRITE_PATH . 'admin/manage_rights.php');
+        break;
+
+
+
+    default:
+        include(FACETAGWRITE_PATH . 'admin/help.php');
+        break;
 }
-else
-{
-  // Par défaut, charger help.php
-  include(FACETAGWRITE_PATH . 'admin/help.php');
-}
+
+//*error_log('DEBUG: admin.php terminé');
 ?>

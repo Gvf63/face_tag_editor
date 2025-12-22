@@ -20,7 +20,7 @@ function plugin_activate()
 // Désinstallation du plugin
 function plugin_uninstall()
 {
-    
+  conf_delete_param('face_tag_editor_config');  
 }
 
 // Désactivation du plugin

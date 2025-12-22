@@ -1,7 +1,7 @@
 <?php
 /*
 Plugin Name: face_tag_editor
-Version: 2.0a
+Version: 2.1
 Description: Créer et enregistrer les tags de visages dans les métadonnées XMP et description 
 Plugin URI: https://piwigo.org/ext/extension_view.php?eid=1053
 Author: Charles69
@@ -10,7 +10,9 @@ Has Settings: webmaster
 
 //============= VERSIONS ============================================
 /*
-version 2.0a  en cours
+version 2.1  22/12/2025
+    ajouté : gestion des .original
+    ajouté : gestion des droits des users
     corrigé décalage texte sur jpg exporté
     corrigé changement de langue aléatoire
 
@@ -126,11 +128,11 @@ define('FACETAGWRITE_ID', basename(dirname(__FILE__)));
 define('FACETAGWRITE_PATH', PHPWG_PLUGINS_PATH . FACETAGWRITE_ID . '/');
 define('FACETAGWRITE_ADMIN', get_root_url() . 'admin.php?page=plugin-' . FACETAGWRITE_ID); // admin.php?page=plugin-face_tag_editor
 
-// Logs -------------------------------------- V2.0
-error_reporting(E_ALL);
-ini_set('display_errors', 0);
-ini_set('log_errors', 1);
-ini_set('error_log', './plugins/face_tag_editor/face_tag_editor_debug.log');
+// Logs -------------------------------------- à activer pour débugage -  V2.0
+//error_reporting(E_ALL);
+//ini_set('display_errors', 0);
+//ini_set('log_errors', 1);
+//ini_set('error_log', './plugins/face_tag_editor/face_tag_editor_debug.log');
 
 
 
@@ -144,6 +146,7 @@ require_once(FACETAGWRITE_PATH . 'lib/metadata_writer.php');
 require_once(FACETAGWRITE_PATH . 'lib/metadata_merger.php');
 require_once(FACETAGWRITE_PATH . 'lib/file_resolver.php');
 require_once(FACETAGWRITE_PATH . 'lib/restore_original.php');
+require_once(FACETAGWRITE_PATH . 'lib/rights_manager.php');
 require_once(FACETAGWRITE_PATH . 'img/icon_svg.php'); // image du bouton taguer
 
 
@@ -185,7 +188,20 @@ function face_tag_write_load_scripts()
     return;
   }
   
+  // Récupérer la configuration
+  $config_string = conf_get_param('face_tag_editor_config', false);
+  $config = $config_string ? unserialize($config_string) : array();
+  
+  // Définir les valeurs par défaut
+  $save_original = isset($config['save_original']) ? $config['save_original'] : true;
+  
   $template->append('footer_elements', '
+  <script>
+  // Configuration globale pour face_tag_editor
+  window.faceTagConfig = {
+      saveOriginal: ' . ($save_original ? 'true' : 'false') . '
+  };
+  </script>
   <script src="' . FACETAGWRITE_PATH . 'template/draw_faces.js"></script>
   ');
 }
@@ -193,10 +209,10 @@ function face_tag_write_load_scripts()
 // ==================== AJOUTER LE BOUTON ====================
 add_event_handler('loc_end_picture', 'face_tag_write_add_button');
 
-// ==================== VÉRIFICATION DES DROITS D'ACCÈS ====================
+// ==================== VÉRIFICATION DES DROITS D'ACCÈS ====================  V2.1
 function face_tag_write_check_access()
 {
-  global $user;
+  global $user, $page;
   
   // Webmaster : accès total
   if (is_webmaster())
@@ -213,19 +229,20 @@ function face_tag_write_check_access()
   // Vérifier si l'utilisateur appartient au groupe 'FaceTag'
   if (!empty($user['id']))
   {
-    $query = '
-    SELECT g.name
-    FROM ' . USER_GROUP_TABLE . ' AS ug
-    INNER JOIN ' . GROUPS_TABLE . ' AS g ON ug.group_id = g.id
-    WHERE ug.user_id = ' . intval($user['id']) . '
-    AND g.name = "FaceTag"';
+    // Charger les fonctions de gestion des droits
+    include_once(FACETAGWRITE_PATH . 'lib/rights_manager.php');
     
-    $result = pwg_query($query);
-    
-    if (pwg_db_num_rows($result) > 0)
-    {
-      return true;
+    if (!user_in_facetag_group($user['id'])) {
+      return false;
     }
+    
+    // Si on est sur une page photo, vérifier les droits spécifiques
+    if (isset($page['image_id'])) {
+      return can_user_tag_image($user['id'], $page['image_id']);
+    }
+    
+    // Sinon (page générale), autoriser
+    return true;
   }
   
   // Accès refusé
@@ -502,7 +519,7 @@ function face_tag_write_get_xmp($params, &$service)
   error_reporting($old_error_reporting);
   ini_set('display_errors', $old_display_errors);
   
-  error_log('SUCCESS: Returning data');
+  //*error_log('SUCCESS: Returning data');
 
   // === AJOUT : Parser les faces côté serveur ===
   require_once(FACETAGWRITE_PATH . 'lib/metadata_reader.php');
@@ -734,19 +751,39 @@ if ($description === '') {
   
   //*error_log('Fichier pour lecture métadonnées: ' . $temp_for_reading);
   
-  // Créer backup
-  $backup_path = $real_local_path . '.original';
-  $backup_created = false;
-  
-  if (!file_exists($backup_path)) {
-    if (@copy($real_local_path, $backup_path)) {
-      @chmod($backup_path, 0444);
-      $backup_created = true;
-      //*error_log('Backup créé');
-    }
+// ------------------------- BACKUP . original ------------------------------------------------------- V2.1
+  // Récupérer le paramètre save_original depuis la requête 
+$save_original_param = isset($params['save_original']) ? $params['save_original'] : null;
+
+// Si non fourni dans la requête, utiliser la config par défaut
+if ($save_original_param === null) {
+  $config_string = conf_get_param('face_tag_editor_config', false);
+  $config = $config_string ? unserialize($config_string) : array();
+  $save_original = isset($config['save_original']) ? $config['save_original'] : true;
+} else {
+  // Convertir en booléen (au cas où c'est une string 'true'/'false' depuis JS)
+  $save_original = ($save_original_param === 'true' || $save_original_param === true || $save_original_param === 1);
+}
+
+// Créer backup SEULEMENT si activé
+$backup_path = $real_local_path . '.original';
+$backup_created = false;
+
+if ($save_original && !file_exists($backup_path)) {
+  if (@copy($real_local_path, $backup_path)) {
+    @chmod($backup_path, 0444);
+    $backup_created = true;
+    //*error_log('Backup créé');
+  }
+} else {
+  if (!$save_original) {
+    //*error_log('Création backup désactivée dans la config');
   } else {
     //*error_log('Backup existe déjà');
   }
+}
+
+//----------------------------------------------------------------------------------------------------------
   
   // IMPORTANT : Toujours rendre le fichier writable avant modification
   // (car il peut avoir été mis en 0644 lors d'une précédente sauvegarde)

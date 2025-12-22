@@ -57,4 +57,68 @@ $lang['Télécharger l\'image avec les rectangles visibles'] = 'Download image w
 $lang['Aucun visage tagué à télécharger'] = 'No tagged faces to download';
 $lang['Erreur lors de la génération de l\'image'] = 'Error generating image';
 
+$lang['Gestion des .original'] = 'Manage .original files';
+$lang['Gestion des droits'] = 'Manage rights';
+
+// Gestion des .original
+$lang['Configuration enregistrée'] = 'Configuration saved';
+$lang['Créer un fichier de sauvegarde .original lors du premier enregistrement de tags'] = 'Create a .original backup file when saving tags for the first time';
+$lang['Rechercher et gérer les fichiers .original'] = 'Search and manage .original files';
+$lang['Rechercher les fichiers .original'] = 'Search for .original files';
+$lang['Filtrer par date de création (avant le) :'] = 'Filter by creation date (before):';
+$lang['Filtrer par répertoire (contient) :'] = 'Filter by directory (contains):';
+$lang['Appliquer les filtres'] = 'Apply filters';
+$lang['Effacer les filtres'] = 'Clear filters';
+$lang['Supprimer les fichiers listés'] = 'Delete listed files';
+$lang['Répertoire'] = 'Directory';
+$lang['Nom du fichier'] = 'Filename';
+$lang['Date de création'] = 'Creation date';
+$lang['Taille'] = 'Size';
+$lang['Aucun fichier .original trouvé'] = 'No .original file found';
+$lang['fichier(s) .original trouvé(s) - Espace disque total :'] = '.original file(s) found - Total disk space:';
+$lang['créés avant le'] = 'created before';
+$lang['répertoire contient'] = 'directory contains';
+$lang['Veuillez sélectionner au moins un filtre (date ou répertoire)'] = 'Please select at least one filter (date or directory)';
+$lang['Aucun fichier à supprimer'] = 'No files to delete';
+$lang['Êtes-vous sûr de vouloir supprimer'] = 'Are you sure you want to delete';
+$lang['fichier(s) .original ?'] = '.original file(s)?';
+$lang['Cette action est irréversible !'] = 'This action is irreversible!';
+$lang['fichier(s) supprimé(s)'] = 'file(s) deleted';
+$lang['échec(s)'] = 'failure(s)';
+$lang['Erreurs lors de la suppression:'] = 'Errors during deletion:';
+$lang['Espace disque total :'] = 'Total disk space:';
+$lang['créés avant le'] = 'created before';
+$lang['répertoire contient'] = 'directory contains';
+$lang['fichier(s) trouvé(s)'] = 'file(s) found';
+
+// Gestion des droits
+$lang['Gestion des droits de tagging'] = 'Manage tagging rights';
+$lang['Mode de fonctionnement du groupe FaceTag'] = 'FaceTag group operating mode';
+$lang['Les webmasters et administrateurs ont toujours un accès total, quel que soit le mode sélectionné.'] = 'Webmasters and administrators always have full access, regardless of the selected mode.';
+$lang['Tous les albums'] = 'All albums';
+$lang['Les utilisateurs du groupe FaceTag peuvent taguer dans tous les albums qu\'ils peuvent voir'] = 'Users in the FaceTag group can tag in all albums they can view';
+$lang['Sélectif par utilisateur'] = 'Selective by user';
+$lang['Configuration individuelle des albums autorisés pour chaque utilisateur'] = 'Individual configuration of authorized albums for each user';
+$lang['Enregistrer le mode'] = 'Save mode';
+$lang['Configuration des utilisateurs du groupe FaceTag'] = 'Configuration of FaceTag group users';
+$lang['Aucun utilisateur dans le groupe FaceTag.'] = 'No users in the FaceTag group.';
+$lang['Gérer les groupes'] = 'Manage groups';
+$lang['utilisateur(s) dans le groupe FaceTag. Sélectionnez jusqu\'à 5 albums par utilisateur (les sous-albums sont automatiquement inclus).'] = 'user(s) in the FaceTag group. Select up to 5 albums per user (sub-albums are automatically included).';
+$lang['Enregistrer les permissions'] = 'Save permissions';
+$lang['Filtrer les albums...'] = 'Filter albums...';
+$lang['-- Sélectionner un album --'] = '-- Select an album --';
+$lang['Tapez pour rechercher...'] = 'Type to search...';
+$lang['Aucun résultat'] = 'No results';
+$lang['Maximum 5 albums par utilisateur'] = 'Maximum 5 albums per user';
+$lang['Albums autorisés (sous-albums inclus) :'] = 'Authorized albums (sub-albums included):';
+$lang['albums'] = 'albums';
+$lang['Veuillez sélectionner un album dans la liste'] = 'Please select an album from the list';
+$lang['Configuration enregistrée avec succès'] = 'Configuration saved successfully';
+$lang['Mode: Tous les albums'] = 'Mode: All albums';
+$lang['Les configurations utilisateurs sont conservées et seront réappliquées si vous revenez en mode sélectif.'] = 'User configurations are preserved and will be reapplied if you switch back to selective mode.';
+$lang['Les configurations utilisateurs sont conservées même en mode "Tous les albums". Elles seront automatiquement réappliquées si vous revenez en mode "Sélectif".'] = 'User configurations are preserved even in "All albums" mode. They will be automatically reapplied if you switch back to "Selective" mode.';
+
+
+
+
 ?>
