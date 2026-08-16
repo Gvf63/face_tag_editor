@@ -28,6 +28,36 @@
         return (typeof facetagLang !== 'undefined' && facetagLang[text]) ? facetagLang[text] : text;
       }
 
+
+    // ==================== CHARGEMENT LAZY DES TRADUCTIONS ====================
+let facetagLang = null;
+let translationsPromise = null;
+
+async function loadFacetagTranslations() {
+  if (facetagLang) {
+    return facetagLang;
+  }
+  
+  if (!translationsPromise) {
+    translationsPromise = fetch('ws.php?format=json&method=facetag.getTranslations')
+      .then(response => response.json())
+      .then(data => {
+        if (data.stat === 'ok' && data.result) {
+          facetagLang = data.result;
+          return facetagLang;
+        } else {
+          throw new Error('Erreur chargement traductions');
+        }
+      })
+      .catch(error => {
+        console.error('Erreur chargement traductions face tag:', error);
+        return null;
+      });
+  }
+  
+  return translationsPromise;
+}  
+
     // ==================== FONCTION DE TRANSFORMATION DES COORDONNÉES (EXIF) ====================
     // Fonction pour transformer les coordonnées selon l'orientation EXIF
     // Valeurs possibles : 1-8 (voir spec EXIF)
@@ -172,44 +202,45 @@
       document.head.appendChild(script);
     }
     
-    // ==================== OUVERTURE DE LA MODAL ======================================================
-    $(document).on('click', '#facetag-open-editor', function(e) {
-      e.preventDefault();
-      
-      //*console.log('=== CLIC SUR TAGUER ===');
-      
-      imageId = $(this).data('image-id');
-      imageSrc = $(this).data('image-src');
-      saveUrl = $(this).data('save-url');
-      // Lire hasOriginal depuis le bouton du DOM à CHAQUE fois
-      hasOriginal = $(this).data('has-original') === 'true' || $(this).data('has-original') === true;
+// ==================== OUVERTURE DE LA MODAL ======================================================
+$(document).on('click', '#facetag-open-editor', async function(e) {
+  e.preventDefault();
+  
+  //*console.log('=== CLIC SUR TAGUER ===');
+  
+  // Désactiver le bouton pendant le chargement
+  var $btn = $(this);
+  var originalText = $btn.text();
+  $btn.prop('disabled', true).text('Chargement...');
+  
+  imageId = $btn.data('image-id');
+  imageSrc = $btn.data('image-src');
+  saveUrl = $btn.data('save-url');
+  // Lire hasOriginal depuis le bouton du DOM à CHAQUE fois
+  hasOriginal = $btn.data('has-original') === 'true' || $btn.data('has-original') === true;
 
-      //*console.log('Image ID:', imageId, '- Has a backup original:', hasOriginal);
-      //*console.log('Image ID:', imageId);
-      //*console.log('Image URL:', imageSrc);
-      //*console.log('Nom du fichier:', imageSrc.split('/').pop());
-      //*console.log('Save URL:', saveUrl);
+  //*console.log('Image ID:', imageId, '- Has a backup original:', hasOriginal);
+  //*console.log('Image ID:', imageId);
+  //*console.log('Image URL:', imageSrc);
+  //*console.log('Nom du fichier:', imageSrc.split('/').pop());
+  //*console.log('Save URL:', saveUrl);
 
-    //---------------------------------------------------------------------------
-    // Supprimer le log au début
-    $.ajax({
-    url: saveUrl.replace('saveXMP', 'clearLog'),
-    method: 'POST',
-    dataType: 'json',
-    success: function(response) {
-      //*console.log('Log supprimé');
-    },
-    error: function(xhr, status, error) {
-      //*console.log('Erreur suppression log (non bloquant):', error);
-    }
+  try {
+    // Charger les traductions d'abord
+    await loadFacetagTranslations();
+    
+    // Puis charger Fabric.js et ouvrir la modal
+    loadFabricJS(function() {
+      //console.log('Fabric.js prêt, ouverture de la modale');
+      $btn.prop('disabled', false).text(originalText);
+      openModal();
     });
-    //----------------------------------------------------------------------------
-      // Charger Fabric.js puis ouvrir la modal
-      loadFabricJS(function() {
-        //console.log('Fabric.js prêt, ouverture de la modale');
-        openModal();
-      });
-    });
+  } catch (error) {
+    console.error('Erreur lors du chargement:', error);
+    $btn.prop('disabled', false).text(originalText);
+    alert('Erreur lors du chargement de l\'éditeur');
+  }
+});
     
     // ==================== CRÉER LA MODALE ============================================================
     function openModal() {
@@ -269,7 +300,7 @@ var modalHtml = `
       
       <div class="modal-footer-right">
         <button id="facetag-cancel">${_('Annuler')}</button>
-        <button id="facetag-save-xmp">💾 ${_('Enregistrer')}</button>
+        <button id="facetag-save-xmp">💾 ${_('Enregistrer ')}</button>
       </div>
 
     </div>
@@ -436,7 +467,7 @@ error: function(xhr, status, error) {
 
           },
           complete: function() {
-            $('#facetag-save-xmp').prop('disabled', false).text('💾 Enregistrer');
+            $('#facetag-save-xmp').prop('disabled', false).text('💾 Enregistrer ');
           }
         });
       });

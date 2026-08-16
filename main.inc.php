@@ -1,7 +1,7 @@
 <?php
 /*
 Plugin Name: face_tag_editor
-Version: 2.1
+Version: 2.2
 Description: Créer et enregistrer les tags de visages dans les métadonnées XMP et description 
 Plugin URI: https://piwigo.org/ext/extension_view.php?eid=1053
 Author: Charles69
@@ -10,6 +10,13 @@ Has Settings: webmaster
 
 //============= VERSIONS ============================================
 /*
+version 2.2 - 23/06/2026
+    conformation au standard get_original_url
+
+version 2.1a - 24/01/2026 (non diffusé)
+    traduction : méthode lazy loading
+    langue uk prioritaire
+
 version 2.1  22/12/2025
     ajouté : gestion des .original
     ajouté : gestion des droits des users
@@ -150,6 +157,13 @@ require_once(FACETAGWRITE_PATH . 'lib/rights_manager.php');
 require_once(FACETAGWRITE_PATH . 'img/icon_svg.php'); // image du bouton taguer
 
 
+//===================== CHARGEMENT DES LANGUES , UK PAR DEFAUT ==================
+// Charger d'abord l'anglais comme base
+load_language('plugin.lang', FACETAGWRITE_PATH, array('language' => 'en_UK', 'no_fallback' => true));
+// Puis charger la langue de l'utilisateur (qui écrasera l'anglais si c'est du français)
+load_language('plugin.lang', FACETAGWRITE_PATH);
+//=================================================================================
+
 
 // ==================== CHARGER JQUERY ====================
 add_event_handler('loc_begin_page_header', 'face_tag_write_load_jquery');
@@ -272,6 +286,17 @@ function face_tag_write_add_button()
   
   $original_path = $row['path'];
   $image_url = embellish_url(get_root_url() . $original_path);
+
+  // Compatibilité pdp : laisser le plugin de protection réécrire l'URL si actif
+  // (redirige vers serve_original.php?id=X qui vérifie les droits avant de servir)
+  include_once(PHPWG_ROOT_PATH . 'include/derivative.inc.php');
+  $src_image = new SrcImage(array(
+    'id'   => $picture['current']['id'],
+    'path' => $row['path'],
+    'file' => $row['file'],
+  ));
+  $image_url = trigger_change('get_original_url', $image_url, $src_image);
+
   $save_url = get_root_url() . 'ws.php?format=json&method=facetagwrite.saveXMP';
   
   // Vérifier si le fichier de backup .original existe
@@ -863,7 +888,7 @@ if ($save_original && !file_exists($backup_path)) {
     // Régénérer les miniatures  
     
     try {
-      face_tag_write_regenerate_metadata($params['image_id'], count($faces) > 0, strlen($description) > 0);
+      face_tag_write_regenerate_metadata($params['image_id'], $faces, $description, $real_local_path, $merged_data['all_subjects']);
       //*error_log(' Métadata synchronisées');
     } catch (Exception $e) {
       //*error_log('Erreur synchro metadonnées: ' . $e->getMessage());
@@ -900,37 +925,114 @@ if ($save_original && !file_exists($backup_path)) {
 }
 
 // ==================== SYNCHRONISATION DES METADONNEES ====================
-function face_tag_write_regenerate_metadata($image_id, $has_faces = true, $has_description = true)
+/**
+ * Met à jour les tags Piwigo de la photo d'après l'ensemble exact des
+ * mots-clés qui viennent d'être écrits dans le fichier (visages ET tags
+ * généraux préexistants comme "Scan Alain"), et rafraîchit les champs
+ * impactés par la réécriture (taille, date de synchro).
+ *
+ * N'appelle PAS sync_metadata() : cette fonction core RELIT le fichier et
+ * reconstruit les tags depuis les métadonnées IPTC/EXIF, ce qui s'est avéré
+ * peu fiable lors d'une mise à jour (ex: un tiret dans un nom disparaît).
+ * On utilise ici $all_subjects, la liste EXACTE déjà calculée par
+ * FaceTagMetadataMerger et utilisée par le writer pour composer le XMP/IPTC
+ * — la même source de vérité, sans repasser par un roundtrip fichier ->
+ * Piwigo. Remplace entièrement les tags de la photo par cet ensemble : un
+ * tag qui n'est plus dans $all_subjects (visage renommé/retiré) est retiré,
+ * ceux qui manquent sont ajoutés.
+ *
+ * @param int $image_id
+ * @param array $faces Visages actuellement tagués (chaque élément a une clé 'name') — non utilisé directement ici, gardé pour compat d'appel
+ * @param string $description
+ * @param string|null $file_path Chemin réel du fichier réécrit sur le disque
+ * @param array $all_subjects Liste exacte des mots-clés écrits dans le fichier (issus de FaceTagMetadataMerger::merge()['all_subjects'])
+ */
+function face_tag_write_regenerate_metadata($image_id, $faces = array(), $description = '', $file_path = null, $all_subjects = array())
 {
-  
-  // Charge les fichiers nécessaires
-  if (!function_exists('sync_metadata')) {
-    include_once(PHPWG_ROOT_PATH . 'admin/include/functions_metadata.php');
-  }
-  
   if (!function_exists('tag_id_from_tag_name')) {
     include_once(PHPWG_ROOT_PATH . 'admin/include/functions.php');
   }
 
-  // Si plus de visages, supprimer tous les tags de l'image
-  if (!$has_faces) {
-    //*error_log('Suppression des tags Piwigo (plus de visages)');
-    $query = 'DELETE FROM ' . IMAGE_TAG_TABLE . ' WHERE image_id = ' . intval($image_id);
-    pwg_query($query);
+  $names = array();
+  foreach ($all_subjects as $name)
+  {
+    $name = trim((string)$name);
+    if ($name !== '' && !in_array($name, $names))
+    {
+      $names[] = $name;
+    }
+  }
+
+  if (empty($names))
+  {
+    // Aucun mot-clé du tout (ni visage, ni tag général) : la photo perd tous ses tags.
+    pwg_query('DELETE FROM ' . IMAGE_TAG_TABLE . ' WHERE image_id = ' . intval($image_id) . ';');
+  }
+  else
+  {
+    $tag_ids = array();
+    foreach ($names as $name)
+    {
+      $tag_ids[] = tag_id_from_tag_name($name);
+    }
+    $tag_ids = array_unique($tag_ids);
+
+    // Retire les tags qui ne correspondent plus à un mot-clé du fichier
+    pwg_query('
+DELETE FROM ' . IMAGE_TAG_TABLE . '
+  WHERE image_id = ' . intval($image_id) . '
+    AND tag_id NOT IN (' . implode(',', $tag_ids) . ')
+;');
+
+    $existing_tag_ids = query2array('
+SELECT tag_id
+  FROM ' . IMAGE_TAG_TABLE . '
+  WHERE image_id = ' . intval($image_id) . '
+    AND tag_id IN (' . implode(',', $tag_ids) . ')
+;', null, 'tag_id');
+
+    $missing_tag_ids = array_diff($tag_ids, $existing_tag_ids);
+    if (!empty($missing_tag_ids))
+    {
+      $inserts = array();
+      foreach ($missing_tag_ids as $tag_id)
+      {
+        $inserts[] = array('image_id' => $image_id, 'tag_id' => $tag_id);
+      }
+      mass_inserts(IMAGE_TAG_TABLE, array('image_id', 'tag_id'), $inserts);
+    }
   }
 
   // Si plus de description, la supprimer
-  if (!$has_description) {
+  if (strlen($description) == 0)
+  {
     //*error_log('Suppression de la description Piwigo');
-    $query = 'UPDATE ' . IMAGES_TABLE . ' SET comment = NULL WHERE id = ' . intval($image_id);
-    pwg_query($query);
+    pwg_query('UPDATE ' . IMAGES_TABLE . ' SET comment = NULL WHERE id = ' . intval($image_id) . ';');
   }
 
-    sync_metadata(array($image_id));
-    invalidate_user_cache();
-    //*error_log('✓ Métadonnées Piwigo synchronisées pour image ' . $image_id);
-  
- return true;
+  // Le fichier a été réécrit sur le disque (métadonnées ajoutées/modifiées) :
+  // on rafraîchit sa taille et sa date de synchro sans repasser par
+  // sync_metadata().
+  $update_fields = array('date_metadata_update' => "'" . date('Y-m-d') . "'");
+  if ($file_path !== null && is_file($file_path))
+  {
+    $filesize_kb = @filesize($file_path);
+    if ($filesize_kb !== false)
+    {
+      $update_fields['filesize'] = intval(floor($filesize_kb / 1024));
+    }
+  }
+  $set_clauses = array();
+  foreach ($update_fields as $field => $value)
+  {
+    $set_clauses[] = $field . ' = ' . $value;
+  }
+  pwg_query('UPDATE ' . IMAGES_TABLE . ' SET ' . implode(', ', $set_clauses) . ' WHERE id = ' . intval($image_id) . ';');
+
+  invalidate_user_cache();
+  //*error_log('✓ Tags Piwigo mis à jour directement pour image ' . $image_id);
+
+  return true;
 }
 
 //------------------------------------------------------------------------------
@@ -981,20 +1083,24 @@ WHERE id = ' . intval($params['image_id']);
 
 
 
-// ==================== INJECTION CONDITIONNELLE DES TRADUCTIONS ====================
-add_event_handler('loc_begin_page_header', 'face_tag_editor_inject_translations_conditionally');
+// ==================== TRADUCTIONS Méthode Lazy Loading ====================
 
-function face_tag_editor_inject_translations_conditionally()
+add_event_handler('ws_add_methods', 'facetag_add_ws_methods');
+
+function facetag_add_ws_methods($arr)
 {
-  global $template, $page;
+  $service = &$arr[0];
   
-  // Injecter UNIQUEMENT sur les pages photo (picture.php)
-  if (!isset($page['image_id'])) {
-    return; // Pas une page photo, on sort
-  }
-  
-  // Charger les traductions
-  load_language('plugin.lang', FACETAGWRITE_PATH);
+  $service->addMethod(
+    'facetag.getTranslations',
+    'facetag_ws_get_translations',
+    array(),
+    'Get translations for face tag editor'
+  );
+}
+
+function facetag_ws_get_translations($params, &$service)
+{
   
   // Créer le tableau JavaScript
   $translations = array(
@@ -1040,12 +1146,11 @@ function face_tag_editor_inject_translations_conditionally()
     'Aucun visage tagué à télécharger' => l10n('Aucun visage tagué à télécharger'),
     'Erreur lors de la génération de l\'image' => l10n('Erreur lors de la génération de l\'image')
   );
+
+   return $translations;
   
-  // Injecter en JavaScript avec json_encode (propre et sécurisé)
-  $js = '<script type="text/javascript">window.facetagLang = ' . json_encode($translations, JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) . ';</script>';
-  
-  $template->append('head_elements', $js);
 }
+
 
 
 ?>

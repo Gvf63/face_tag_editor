@@ -12,7 +12,7 @@ $lang['Restaurer l\'original'] = 'Restore original';
 $lang['Restaurer le fichier .original (supprime tous les tags)'] = 'Restore .original file (removes all tags)';
 $lang['Description...'] = 'Description...';
 $lang['Annuler'] = 'Cancel';
-$lang['Enregistrer'] = 'Save';
+$lang['Enregistrer '] = 'Save';
 
 // éditeur liste visages
 $lang['existant'] = 'existing';
