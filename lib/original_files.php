@@ -13,24 +13,27 @@ function find_original_files($date_filter = null, $directory_filter = null) {
 
     $originals = array();
     $timestamp_filter = $date_filter ? strtotime($date_filter . ' 23:59:59') : null;
-    
+
     // Récupérer tous les chemins d'images
-    //$query = 'SELECT path FROM ' . IMAGES_TABLE . ' ORDER BY path';
-    $query = 'SELECT path FROM ' . IMAGES_TABLE . ' WHERE 1=1 /* ' . time() . ' */ ORDER BY path';
+    //$query = 'SELECT id, path, file FROM ' . IMAGES_TABLE . ' ORDER BY path';
+    $query = 'SELECT id, path, file FROM ' . IMAGES_TABLE . ' WHERE 1=1 /* ' . time() . ' */ ORDER BY path';
     $result = pwg_query($query);
     
     while ($row = pwg_db_fetch_assoc($result)) {
-        $image_path = $row['path'];
+        // Chemin utilisé pour localiser le fichier .original sur le disque (résolu si lien
+        // symbolique) : à ne pas confondre avec $row['path'], le chemin DB utilisé plus bas
+        // pour construire l'URL de la photo actuelle.
+        $lookup_path = $row['path'];
         
         // Gérer les liens symboliques si nécessaire
-        if (is_link($image_path)) {
-            $real_path = readlink($image_path);
+        if (is_link($lookup_path)) {
+            $real_path = readlink($lookup_path);
             if ($real_path !== false) {
-                $image_path = $real_path;
+                $lookup_path = $real_path;
             }
         }
         
-        $original_path = $image_path . '.original';
+        $original_path = $lookup_path . '.original';
         
         if (file_exists($original_path)) {
             $mtime = filemtime($original_path);
@@ -50,6 +53,13 @@ function find_original_files($date_filter = null, $directory_filter = null) {
                 }
             }
             
+            // Lien vers la page de visualisation Piwigo de la photo (pas le fichier brut) :
+            // fonctionne indépendamment de pdp, picture.php lit le fichier côté serveur.
+            $picture_url = make_picture_url(array(
+                'image_id'   => $row['id'],
+                'image_file' => $row['file'],
+            ));
+
             $originals[] = array(
                 'full_path' => $original_path,
                 'directory' => $pathinfo['dirname'],
@@ -57,7 +67,8 @@ function find_original_files($date_filter = null, $directory_filter = null) {
                 'date' => $mtime,
                 'date_formatted' => date('Y-m-d H:i:s', $mtime),
                 'size' => filesize($original_path),
-                'size_formatted' => format_bytes(filesize($original_path))
+                'size_formatted' => format_bytes(filesize($original_path)),
+                'picture_url' => $picture_url
             );
         }
     }

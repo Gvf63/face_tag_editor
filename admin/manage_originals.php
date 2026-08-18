@@ -33,7 +33,8 @@ var adminConfigLang = {
     "select_date": "' . l10n('Veuillez sélectionner une date') . '",
     "deleted": "' . l10n('fichier(s) supprimé(s)') . '",
     "failures": "' . l10n('échec(s)') . '",
-    "deletion_errors": "' . l10n('Erreurs lors de la suppression:') . '"
+    "deletion_errors": "' . l10n('Erreurs lors de la suppression:') . '",
+    "view_current_photo": "' . l10n('Voir la photo actuelle') . '"
 };
 </script>
 ');

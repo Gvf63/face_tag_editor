@@ -1,7 +1,7 @@
 <?php
 /*
 Plugin Name: face_tag_editor
-Version: 2.2
+Version: auto
 Description: Créer et enregistrer les tags de visages dans les métadonnées XMP et description 
 Plugin URI: https://piwigo.org/ext/extension_view.php?eid=1053
 Author: Charles69
@@ -10,6 +10,21 @@ Has Settings: webmaster
 
 //============= VERSIONS ============================================
 /*
+
+version 2.3 - 18/08/2026
+    version auto pour PEM piwigo & github
+    ajouté .gitignore
+    corrigé : la désignation saisie n'était jamais enregistrée en base (uniquement écrite dans l'IPTC du fichier)
+    ajouté un éditeur wysiwyg (Trumbowyg) pour la désignation, identique à geo_tag_editor
+    déplacé le champ désignation dans la colonne de droite de la modale
+    les tags des visages créés/renommés sont automatiquement enregistrés dans le registre
+    facetag_person_tags (table créée si nécessaire), indépendamment de l'état d'activation de
+    face_tag, pour que le masquage du nuage de tags reste correct même après une désactivation
+    temporaire de face_tag (la politique d'affichage/l'option restent entièrement dans face_tag)
+    corrigé : l'écriture XMP (template) écrasait silencieusement toutes les métadonnées non liées
+    aux visages (historique d'édition, Extended XMP...) à chaque sauvegarde ; réécrit en fusion
+    DOM chirurgicale qui ne touche qu'aux 6 champs visages/tags et préserve le reste du document
+
 version 2.2 - 23/06/2026
     conformation au standard get_original_url
 
@@ -189,6 +204,10 @@ function face_tag_write_load_css()
   $template->append('head_elements', '
   <link rel="stylesheet" href="' . FACETAGWRITE_PATH . 'css/face_tag_button.css">
   <link rel="stylesheet" href="' . FACETAGWRITE_PATH . 'css/face_tag_modal.css">
+  <link rel="stylesheet" href="' . FACETAGWRITE_PATH . 'css/vendor/trumbowyg/trumbowyg.min.css">
+  <link rel="stylesheet" href="' . FACETAGWRITE_PATH . 'css/vendor/trumbowyg/trumbowyg.colors.min.css">
+  <link rel="stylesheet" href="' . FACETAGWRITE_PATH . 'css/vendor/fonts/roboto.css">
+  <link rel="stylesheet" href="' . FACETAGWRITE_PATH . 'css/vendor/fonts/raleway.css">
   ');
 }
 
@@ -196,7 +215,7 @@ function face_tag_write_load_css()
 add_event_handler('loc_end_page_tail', 'face_tag_write_load_scripts');
 function face_tag_write_load_scripts()
 {
-  global $template, $page;
+  global $template, $page, $user;
   
   if (!isset($page['image_id'])) {
     return;
@@ -209,13 +228,35 @@ function face_tag_write_load_scripts()
   // Définir les valeurs par défaut
   $save_original = isset($config['save_original']) ? $config['save_original'] : true;
   
+  // Choisir la langue Trumbowyg (fr/de/ru disponibles localement, en par défaut sinon)
+  $piwigo_lang = isset($user['language']) ? $user['language'] : 'en_UK';
+  $trumbowyg_lang = 'en';
+  $trumbowyg_lang_script = '';
+  if (strpos($piwigo_lang, 'fr') === 0) {
+    $trumbowyg_lang = 'fr';
+  } elseif (strpos($piwigo_lang, 'de') === 0) {
+    $trumbowyg_lang = 'de';
+  } elseif (strpos($piwigo_lang, 'ru') === 0) {
+    $trumbowyg_lang = 'ru';
+  }
+  if ($trumbowyg_lang !== 'en') {
+    $trumbowyg_lang_script = '<script src="' . FACETAGWRITE_PATH . 'js/vendor/trumbowyg/langs/' . $trumbowyg_lang . '.min.js"></script>';
+  }
+  
   $template->append('footer_elements', '
   <script>
   // Configuration globale pour face_tag_editor
   window.faceTagConfig = {
       saveOriginal: ' . ($save_original ? 'true' : 'false') . '
   };
+  window.FaceTagTrumbowygSvgPath = "' . FACETAGWRITE_PATH . 'css/vendor/trumbowyg/icons.svg";
+  window.FaceTagTrumbowygLang = "' . $trumbowyg_lang . '";
   </script>
+  <script src="' . FACETAGWRITE_PATH . 'js/vendor/trumbowyg/trumbowyg.min.js"></script>
+  ' . $trumbowyg_lang_script . '
+  <script src="' . FACETAGWRITE_PATH . 'js/vendor/trumbowyg/plugins/trumbowyg.fontsize.min.js"></script>
+  <script src="' . FACETAGWRITE_PATH . 'js/vendor/trumbowyg/plugins/trumbowyg.fontfamily.min.js"></script>
+  <script src="' . FACETAGWRITE_PATH . 'js/vendor/trumbowyg/plugins/trumbowyg.colors.min.js"></script>
   <script src="' . FACETAGWRITE_PATH . 'template/draw_faces.js"></script>
   ');
 }
@@ -287,6 +328,11 @@ function face_tag_write_add_button()
   $original_path = $row['path'];
   $image_url = embellish_url(get_root_url() . $original_path);
 
+  // Un attribut class="..." dans le HTML indique une page élaborée dépendant de CSS externe
+  // (ex. collée depuis un logiciel tiers) : on passe alors la description en lecture seule
+  // pour ne pas risquer de la dégrader avec l'éditeur (même logique que geo_tag_editor).
+  $description_is_readonly = (bool) preg_match('/class\s*=\s*["\']/i', $row['comment'] ?? '');
+
   // Compatibilité pdp : laisser le plugin de protection réécrire l'URL si actif
   // (redirige vers serve_original.php?id=X qui vérifie les droits avant de servir)
   include_once(PHPWG_ROOT_PATH . 'include/derivative.inc.php');
@@ -316,6 +362,7 @@ function face_tag_write_add_button()
        data-save-url="' . $save_url . '"
        data-has-original="' . $has_original . '"
        data-description="' . htmlspecialchars($row['comment'] ?? '', ENT_QUOTES, 'UTF-8') . '"
+       data-description-is-readonly="' . ($description_is_readonly ? 'true' : 'false') . '"
        class="pwg-state-default pwg-button" 
        title="' . $tag_title . '" 
        rel="nofollow">
@@ -333,6 +380,7 @@ function face_tag_write_add_button()
          data-save-url="' . $save_url . '"
          data-has-original="' . $has_original . '"
          data-description="' . htmlspecialchars($row['comment'] ?? '', ENT_QUOTES, 'UTF-8') . '"
+       data-description-is-readonly="' . ($description_is_readonly ? 'true' : 'false') . '"
          class="btn btn-primary" 
          title="' . $tag_title . '" 
          rel="nofollow">
@@ -668,6 +716,11 @@ if ($description === '') {
 } else {
   //*error_log('Description non fournie (null)');
 }
+
+// La description n'est envoyée par le JS que si le champ était éditable (pas en lecture seule).
+// Si elle n'a pas été envoyée, on ne touche ni à l'IPTC ni au commentaire en base : on garde
+// tel quel ce qui existe déjà (voir $comment_to_keep plus bas).
+$description_sent = isset($params['description']);
   
  $faces_json = $params['faces'];
 
@@ -697,7 +750,7 @@ if ($description === '') {
   //*error_log('-> ' . count($faces) . ' visages à  enregistrer');
   
   $query = '
-  SELECT path
+  SELECT path, comment
   FROM ' . IMAGES_TABLE . '
   WHERE id = ' . intval($params['image_id']);
   
@@ -710,6 +763,11 @@ if ($description === '') {
     ini_set('display_errors', $old_display_errors);
     return new PwgError(404, 'Image not found');
   }
+  
+  // Valeur de comment à réaffirmer en base après l'écriture des métadonnées :
+  // - description envoyée -> c'est la nouvelle valeur (HTML riche compris, peut être null pour effacer)
+  // - description non envoyée (champ en lecture seule) -> on garde la valeur actuelle en base
+  $comment_to_keep = $description_sent ? $description : $row['comment'];
   
   // Construire le chemin local et le résoudre (gère les liens symboliques)
   $real_local_path = face_tag_write_resolve_path($row['path']);
@@ -831,9 +889,13 @@ if ($save_original && !file_exists($backup_path)) {
   // Nettoyer le fichier de lecture
   @unlink($temp_for_reading);
   
+  // Dériver une version texte brut de la description pour l'IPTC (2#120 ne supporte pas le HTML) ;
+  // ne l'écrire dans le fichier que si elle a été explicitement envoyée par le client.
+  $iptc_description = ($description !== null) ? face_tag_html_to_plain_text($description) : null;
+  
   // Écrire métadonnées sur le fichier temporaire
   try {
-    $result = $writer->writeMetadata($temp_file, $faces, $merged_data, $description);
+    $result = $writer->writeMetadata($temp_file, $faces, $merged_data, $iptc_description, $description_sent);
   } catch (Exception $e) {
     //*error_log('Exception: ' . $e->getMessage());
     @unlink($temp_file);
@@ -888,10 +950,16 @@ if ($save_original && !file_exists($backup_path)) {
     // Régénérer les miniatures  
     
     try {
-      face_tag_write_regenerate_metadata($params['image_id'], $faces, $description, $real_local_path, $merged_data['all_subjects']);
+      face_tag_write_regenerate_metadata($params['image_id'], $faces, $comment_to_keep, $real_local_path, $merged_data['all_subjects']);
       //*error_log(' Métadata synchronisées');
     } catch (Exception $e) {
       //*error_log('Erreur synchro metadonnées: ' . $e->getMessage());
+    }
+
+    try {
+      face_tag_write_register_facetag_person_tags($params['image_id'], $faces);
+    } catch (Exception $e) {
+      error_log('face_tag_editor: erreur enregistrement facetag_person_tags: ' . $e->getMessage());
     }
     
     
@@ -941,13 +1009,19 @@ if ($save_original && !file_exists($backup_path)) {
  * tag qui n'est plus dans $all_subjects (visage renommé/retiré) est retiré,
  * ceux qui manquent sont ajoutés.
  *
+ * Réaffirme aussi systématiquement la colonne 'comment' (désignation) avec la valeur voulue
+ * par l'appelant ($description, HTML riche compris) : c'est la seule mise à jour de ce champ,
+ * donc l'appelant doit y passer soit la nouvelle valeur envoyée par le client, soit la valeur
+ * actuelle inchangée si le client n'en a pas envoyé (voir $comment_to_keep dans
+ * face_tag_write_save_xmp()).
+ *
  * @param int $image_id
  * @param array $faces Visages actuellement tagués (chaque élément a une clé 'name') — non utilisé directement ici, gardé pour compat d'appel
- * @param string $description
+ * @param string|null $description Valeur voulue pour piwigo_images.comment (HTML riche compris), null pour effacer
  * @param string|null $file_path Chemin réel du fichier réécrit sur le disque
  * @param array $all_subjects Liste exacte des mots-clés écrits dans le fichier (issus de FaceTagMetadataMerger::merge()['all_subjects'])
  */
-function face_tag_write_regenerate_metadata($image_id, $faces = array(), $description = '', $file_path = null, $all_subjects = array())
+function face_tag_write_regenerate_metadata($image_id, $faces = array(), $description = null, $file_path = null, $all_subjects = array())
 {
   if (!function_exists('tag_id_from_tag_name')) {
     include_once(PHPWG_ROOT_PATH . 'admin/include/functions.php');
@@ -1003,12 +1077,13 @@ SELECT tag_id
     }
   }
 
-  // Si plus de description, la supprimer
-  if (strlen($description) == 0)
-  {
-    //*error_log('Suppression de la description Piwigo');
-    pwg_query('UPDATE ' . IMAGES_TABLE . ' SET comment = NULL WHERE id = ' . intval($image_id) . ';');
-  }
+  // Réaffirmer la désignation (comment) en base : c'est la seule mise à jour de ce champ, elle
+  // doit donc couvrir tous les cas (nouvelle valeur HTML riche, effacement, ou valeur inchangée
+  // transmise telle quelle par l'appelant quand la description n'a pas été envoyée par le client).
+  $comment_sql = ($description === null || strlen($description) == 0)
+    ? 'NULL'
+    : "'" . pwg_db_real_escape_string($description) . "'";
+  pwg_query('UPDATE ' . IMAGES_TABLE . ' SET comment = ' . $comment_sql . ' WHERE id = ' . intval($image_id) . ';');
 
   // Le fichier a été réécrit sur le disque (métadonnées ajoutées/modifiées) :
   // on rafraîchit sa taille et sa date de synchro sans repasser par
@@ -1033,6 +1108,112 @@ SELECT tag_id
   //*error_log('✓ Tags Piwigo mis à jour directement pour image ' . $image_id);
 
   return true;
+}
+
+// ==================== INTÉGRATION AVEC LE PLUGIN face_tag ====================
+/**
+ * Le plugin face_tag peut masquer les tags de visage du nuage de tags public, via un registre
+ * (table facetag_person_tags, tag_id -> is_face_tag=1) qu'il relit à chaque affichage du nuage
+ * si son option "masquer les tags visage" est cochée. Cette politique d'affichage (option +
+ * filtrage) reste entièrement dans face_tag, inchangée.
+ *
+ * En revanche, la tenue à jour du registre lui-même NE DOIT PAS dépendre de l'état d'activation
+ * de face_tag : si face_tag est désactivé temporairement pendant qu'on crée/renomme des visages
+ * avec face_tag_editor, puis réactivé, les tags créés dans l'intervalle doivent déjà être dans
+ * le registre - sinon ils restent visibles dans le nuage jusqu'à un scan manuel, comme si
+ * l'option avait été "annulée" (cas remonté par l'utilisateur le 2026-08-17). On enregistre donc
+ * ici systématiquement, à chaque sauvegarde de visages, que face_tag soit actif ou non, avec
+ * exactement la même requête SQL que face_tag utilise pour ses propres écritures (même table,
+ * mêmes règles de préservation d'une ligne 'manual').
+ *
+ * @return string Nom complet (avec préfixe) de la table facetag_person_tags
+ */
+function face_tag_write_ensure_facetag_person_tags_table()
+{
+  global $prefixeTable;
+  $table = $prefixeTable . 'facetag_person_tags';
+
+  // Même définition que facetag_ensure_sync_tables() dans face_tag/admin/functions.inc.php :
+  // indépendante de face_tag pour que la table existe même s'il n'a jamais été activé.
+  pwg_query('
+CREATE TABLE IF NOT EXISTS ' . $table . ' (
+  tag_id           INT UNSIGNED NOT NULL,
+  is_face_tag      TINYINT(1)   NOT NULL DEFAULT 1,
+  source           ENUM(\'auto\',\'manual\') NOT NULL DEFAULT \'auto\',
+  example_image_id INT UNSIGNED NULL,
+  updated_at       DATETIME NOT NULL,
+  PRIMARY KEY (tag_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;');
+
+  return $table;
+}
+
+/**
+ * Enregistre les tag_id des visages de la photo dans le registre facetag_person_tags,
+ * inconditionnellement (voir docblock ci-dessus).
+ *
+ * @param int $image_id
+ * @param array $faces Visages actuellement tagués (chaque élément a une clé 'name')
+ */
+function face_tag_write_register_facetag_person_tags($image_id, $faces)
+{
+  if (empty($faces))
+  {
+    return;
+  }
+
+  if (!function_exists('tag_id_from_tag_name'))
+  {
+    include_once(PHPWG_ROOT_PATH . 'admin/include/functions.php');
+  }
+
+  $names = array();
+  foreach ($faces as $face)
+  {
+    if (empty($face['name']))
+    {
+      continue;
+    }
+    $name = trim((string)$face['name']);
+    if ($name !== '' && !in_array($name, $names))
+    {
+      $names[] = $name;
+    }
+  }
+
+  if (empty($names))
+  {
+    return;
+  }
+
+  $person_tags_table = face_tag_write_ensure_facetag_person_tags_table();
+  $now = date('Y-m-d H:i:s');
+
+  foreach ($names as $name)
+  {
+    $tag_id = tag_id_from_tag_name($name);
+
+    pwg_query('
+INSERT INTO ' . $person_tags_table . ' (tag_id, is_face_tag, source, example_image_id, updated_at)
+VALUES (' . intval($tag_id) . ', 1, \'auto\', ' . intval($image_id) . ', \'' . $now . '\')
+ON DUPLICATE KEY UPDATE
+  example_image_id = IF(source=\'manual\', example_image_id, VALUES(example_image_id)),
+  updated_at = IF(source=\'manual\', updated_at, VALUES(updated_at))
+;');
+  }
+}
+
+// ==================== DÉRIVATION TEXTE BRUT POUR IPTC ====================
+// L'IPTC (tag 2#120, Caption-Abstract) ne supporte pas le HTML. On en dérive une version
+// texte brut pour le fichier, sans jamais relire ce texte brut pour reconstituer le HTML
+// riche stocké en BDD (round-trip à sens unique, portage de geo_tag_editor).
+function face_tag_html_to_plain_text($html)
+{
+  $text = preg_replace('/<br\s*\/?>/i', "\n", $html);
+  $text = preg_replace('/<\/p>/i', "\n", $text);
+  $text = html_entity_decode(strip_tags($text), ENT_QUOTES, 'UTF-8');
+  $text = trim($text);
+  return ($text === '') ? null : $text;
 }
 
 //------------------------------------------------------------------------------
@@ -1114,6 +1295,8 @@ function facetag_ws_get_translations($params, &$service)
     'Restaurer l\'original' => l10n('Restaurer l\'original'),
     'Restaurer le fichier .original (supprime tous les tags)' => l10n('Restaurer le fichier .original (supprime tous les tags)'),
     'Description...' => l10n('Description...'),
+    'Description' => l10n('Description'),
+    'Lecture seule : mise en forme HTML complexe détectée, non modifiable ici.' => l10n('Lecture seule : mise en forme HTML complexe détectée, non modifiable ici.'),
     'Annuler' => l10n('Annuler'),
     'Enregistrer' => l10n('Enregistrer'),
     'existant' => l10n('existant'),

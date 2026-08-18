@@ -8,10 +8,16 @@
 if (!defined('PHPWG_ROOT_PATH')) die('Hacking attempt!');
 
 /**
- * Extraire le segment XMP d'un fichier JPEG
- * 
+ * Extraire le segment XMP d'un fichier JPEG, en recollant l'éventuel "Extended XMP"
+ * (mécanisme standard quand le paquet XMP dépasse 64 Ko : un segment "principal" avec un
+ * pointeur xmpNote:HasExtendedXMP, plus un ou plusieurs segments APP1 "extension" contenant
+ * la suite). Sans ça, un fichier avec beaucoup de métadonnées préexistantes (ex: photos
+ * Google Pixel HDR+/Motion Photo) ne renvoie que le segment principal tronqué, et les
+ * visages - souvent placés plus loin dans le document - disparaissent silencieusement de
+ * l'extraction alors qu'ils sont bien présents dans le fichier.
+ *
  * @param string $filepath Chemin vers le fichier JPEG
- * @return string|null Le contenu XML XMP ou null si non trouvé
+ * @return string|null Le contenu XML XMP (principal + extension recollée) ou null si non trouvé
  */
 function facetag_editor_segment($filepath) {
     $fp = fopen($filepath, 'rb');
@@ -26,7 +32,14 @@ function facetag_editor_segment($filepath) {
         return null;
     }
     
-    // Chercher le segment XMP
+    $xmp_id = "http://ns.adobe.com/xap/1.0/\0";
+    $ext_id = "http://ns.adobe.com/xmp/extension/\0";
+    
+    $main_xmp = null;
+    $extended_chunks = array(); // offset => octets du morceau
+    
+    // Parcourir tous les segments (pas d'arrêt au premier XMP trouvé : les segments
+    // d'extension, s'ils existent, se trouvent plus loin dans le fichier)
     while (!feof($fp)) {
         $marker = fread($fp, 2);
         if ($marker === false || strlen($marker) !== 2) break;
@@ -53,18 +66,39 @@ function facetag_editor_segment($filepath) {
         $data = fread($fp, $data_length);
         if (strlen($data) !== $data_length) break;
         
-        // Vérifier si c'est le segment XMP
         if ($marker_type === 0xE1) {
-            $xmp_id = "http://ns.adobe.com/xap/1.0/\0";
-            if (substr($data, 0, strlen($xmp_id)) === $xmp_id) {
-                fclose($fp);
-                return substr($data, strlen($xmp_id));
+            if ($main_xmp === null && substr($data, 0, strlen($xmp_id)) === $xmp_id) {
+                $main_xmp = substr($data, strlen($xmp_id));
+            } elseif (substr($data, 0, strlen($ext_id)) === $ext_id) {
+                // Après l'identifiant : GUID (32 octets) + longueur totale (4) + offset (4).
+                // L'offset est donc aux octets 36-39, pas 32-35 (qui sont la longueur totale) -
+                // erreur corrigée ici : avec plusieurs segments d'extension, l'ancienne version
+                // utilisait la longueur totale (identique pour tous les morceaux) comme clé,
+                // donc chaque morceau écrasait le précédent au lieu de s'accumuler.
+                $rest = substr($data, strlen($ext_id));
+                if (strlen($rest) > 40) {
+                    $offset = unpack('N', substr($rest, 36, 4))[1];
+                    $extended_chunks[$offset] = substr($rest, 40);
+                }
             }
         }
     }
     
     fclose($fp);
-    return null;
+    
+    if ($main_xmp === null) {
+        return null;
+    }
+    
+    if (!empty($extended_chunks)) {
+        ksort($extended_chunks);
+        // Simple concaténation : suffisant pour l'extraction par regex qui suit derrière
+        // (pas besoin d'un document XML unique valide, juste que les balises visage
+        // apparaissent quelque part dans le texte final).
+        $main_xmp .= implode('', $extended_chunks);
+    }
+    
+    return $main_xmp;
 }
 
 /**

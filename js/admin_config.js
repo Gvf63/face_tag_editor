@@ -130,9 +130,23 @@ jQuery(document).ready(function($) {
             $('#btn_delete_originals').prop('disabled', true);
         } else {
             data.files.forEach(function(file) {
+                const $filenameCell = $('<td>');
+                if (file.picture_url) {
+                    // Clic sur le nom de fichier = ouvrir la photo actuelle dans Piwigo (pas le .original)
+                    $('<a>')
+                        .attr('href', file.picture_url)
+                        .attr('target', '_blank')
+                        .attr('rel', 'noopener')
+                        .attr('title', _('view_current_photo'))
+                        .text(file.filename)
+                        .appendTo($filenameCell);
+                } else {
+                    $filenameCell.text(file.filename);
+                }
+
                 const row = $('<tr>')
                     .append($('<td>').text(file.directory))
-                    .append($('<td>').text(file.filename))
+                    .append($filenameCell)
                     .append($('<td>').text(file.date_formatted))
                     .append($('<td>').css('text-align', 'right').text(file.size_formatted));
                 $list.append(row);

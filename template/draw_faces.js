@@ -21,6 +21,8 @@
     var xmpData = null;
     var existingFaces = [];
     var hasOriginal = false;
+    var currentDescription = '';        // Description de l'image (IPTC Caption-Abstract)
+    var isDescriptionReadonly = false;  // true si HTML complexe détecté (class="...") : édition désactivée
 
 
     // Fonction de traduction (à mettre tout en haut du fichier)
@@ -218,6 +220,8 @@ $(document).on('click', '#facetag-open-editor', async function(e) {
   saveUrl = $btn.data('save-url');
   // Lire hasOriginal depuis le bouton du DOM à CHAQUE fois
   hasOriginal = $btn.data('has-original') === 'true' || $btn.data('has-original') === true;
+  currentDescription = $btn.data('description') || '';
+  isDescriptionReadonly = $btn.data('description-is-readonly') === 'true' || $btn.data('description-is-readonly') === true;
 
   //*console.log('Image ID:', imageId, '- Has a backup original:', hasOriginal);
   //*console.log('Image ID:', imageId);
@@ -275,11 +279,18 @@ var modalHtml = `
         </div>
       </div>
       
-      <!-- Sidebar : liste des visages -->
+      <!-- Sidebar : liste des visages + description -->
       <div class="modal-sidebar">
         <h4>👤 ${_('Visages tagués')} (<span id="facetag-count">0</span>)</h4>
         <div id="facetag-faces-list">
           <p>${_('Aucun visage tagué')}</p>
+        </div>
+
+        <!-- Description de l'image -->
+        <div class="description-section">
+          <label for="facetag-description">${_('Description')} :</label>
+          ${isDescriptionReadonly ? '<div class="facetag-description-readonly-notice">' + _('Lecture seule : mise en forme HTML complexe détectée, non modifiable ici.') + '</div>' : ''}
+          <textarea id="facetag-description" rows="3" placeholder="${_('Description...')}"></textarea>
         </div>
       </div>
       
@@ -293,9 +304,6 @@ var modalHtml = `
   <button id="facetag-clear-all">🗑️ ${_('Tout effacer')}</button>
   <button id="facetag-restore-original" title="${_('Restaurer le fichier .original (supprime tous les tags)')}">⮪️ ${_('Restaurer l\'original')}</button>
   <button id="facetag-download-jpg" title="${_('Télécharger l\'image avec les rectangles visibles')}">📥 ${_('Télécharger JPG')}</button>
-  <div class="description-wrapper">
-    <textarea id="facetag-description" rows="2" placeholder="${_('Description...')}"></textarea>
-  </div>
 </div>
       
       <div class="modal-footer-right">
@@ -314,9 +322,86 @@ var modalHtml = `
 
 
   
-// Charger la description
-var description = $('#facetag-open-editor').data('description') || '';
-$('#facetag-description').val(description);
+// Charger la description existante : Trumbowyg si éditable, affichage brut sinon
+if (isDescriptionReadonly) {
+  $('#facetag-description').replaceWith(
+    '<div id="facetag-description" class="facetag-description-readonly-view">' + currentDescription + '</div>'
+  );
+} else {
+  $('#facetag-description').trumbowyg({
+    svgPath: window.FaceTagTrumbowygSvgPath,
+    lang: window.FaceTagTrumbowygLang || 'en',
+    btns: [
+      ['undo', 'redo'],
+      ['formatting'],
+      ['fontfamily'],
+      ['fontsize'],
+      ['strong', 'em', 'underline', 'strikethrough'],
+      ['foreColor', 'backColor'],
+      ['justifyLeft', 'justifyCenter', 'justifyRight', 'justifyFull'],
+      ['unorderedList', 'orderedList'],
+      ['link'],
+      ['removeformat'],
+      ['viewHTML'],
+      ['fullscreen']
+    ],
+    btnsDef: {
+      formatting: {
+        dropdown: ['p', 'blockquote', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'],
+        ico: 'p'
+      }
+    },
+    plugins: {
+      fontsize: { sizeList: ['14px', '16px', '18px', '22px', '24px', '26px'], allowCustomSize: true },
+      fontfamily: { fontList: [
+        { name: 'Arial', family: 'Arial, Helvetica, sans-serif' },
+        { name: 'Roboto', family: 'Roboto, Arial, sans-serif' },
+        { name: 'Georgia', family: 'Georgia, serif' },
+        { name: 'Times New Roman', family: 'Times New Roman, Times, serif' },
+        { name: 'Courier New', family: 'Courier New, Courier, monospace' },
+        { name: 'Verdana', family: 'Verdana, Geneva, sans-serif' },
+        { name: 'Tahoma', family: 'Tahoma, Geneva, sans-serif' },
+        { name: 'Trebuchet MS', family: 'Trebuchet MS, Helvetica, sans-serif' },
+        { name: 'Raleway', family: 'Raleway, Arial, sans-serif' }
+      ] }
+    }
+  });
+  $('#facetag-description').trumbowyg('html', currentDescription);
+
+  // Bug connu de Trumbowyg : toggleSpan() (déclenché par Entrée/Retour arrière/Suppr,
+  // keyCodes 8/13/46) est censé ne supprimer que les spans "fantômes" vides créés
+  // par le navigateur lors d'un saut de ligne, mais sa détection par flag
+  // (data-tbw-flag) est trop fragile : this.$ed.find("span") cherche dans TOUT
+  // l'éditeur, et si un seul span existant perd son flag entre le keydown et le
+  // keyup, il est traité comme fantôme et supprimé (contenu conservé, style perdu)
+  // même sans rapport avec l'édition en cours. On remplace par une version qui ne
+  // nettoie que les spans réellement vides ou sans attribut significatif.
+  // (portage de geo_tag_editor)
+  var trumbowygInstance = $('#facetag-description').data('trumbowyg');
+  if (trumbowygInstance) {
+    var trumbowygProto = Object.getPrototypeOf(trumbowygInstance);
+    trumbowygProto.toggleSpan = function() {
+      this.$ed.find('span').each(function() {
+        var $span = $(this);
+        var isEmpty = $span.contents().length === 0;
+        var hasNoFormatting = !$span.attr('style') && !$span.attr('class') && $span.text().trim() === '';
+        if (isEmpty || hasNoFormatting) {
+          $span.contents().unwrap();
+        }
+      });
+    };
+  }
+
+  // Empêcher un éventuel raccourci clavier du cœur Piwigo de capter les touches tapées
+  // dans l'éditeur (sa garde ne fonctionne pas sur un contenteditable). Phase capture
+  // pour intercepter avant que l'événement ne remonte au handler global.
+  var trumbowygEditorEl = $('#facetag-modal .trumbowyg-editor')[0];
+  if (trumbowygEditorEl) {
+    trumbowygEditorEl.addEventListener('keydown', function(e) {
+      e.stopPropagation();
+    }, true);
+  }
+}
 
 
       //-------------------------------------------------------------------------------------------------
@@ -375,8 +460,12 @@ $('#facetag-description').val(description);
         var formData = new FormData();
         formData.append('image_id', imageId);
         formData.append('faces', JSON.stringify(facesData));
-        var description = $('#facetag-description').val() || '';
-        formData.append('description', description);    
+        // Ne pas envoyer la description si elle est en lecture seule : le backend garde alors
+        // la valeur existante en base et ne touche pas au tag IPTC (voir main.inc.php).
+        if (!isDescriptionReadonly) {
+          var description = $('#facetag-description').trumbowyg('html') || '';
+          formData.append('description', description);
+        }
 
 // ✅ AJOUTER LE PARAMÈTRE save_original ---------------------------------------------------- V2.1
         var saveOriginal = window.faceTagConfig ? window.faceTagConfig.saveOriginal : true;
@@ -687,7 +776,7 @@ if (data.stat === 'ok' && xmpContainer && xmpContainer.xmp) {
         //*console.log('Image chargée - Dimensions naturelles:', img.naturalWidth, 'x', img.naturalHeight);
         
         // Calculer les dimensions du canvas pour qu'il tienne dans la zone disponible
-        var maxWidth = window.innerWidth - 400; // -400 pour la sidebar
+        var maxWidth = window.innerWidth - 500; // -500 pour la sidebar (420px + paddings/bordure)
         var maxHeight = window.innerHeight - 200; // -200 pour header/footer
         
         var scale = Math.min(

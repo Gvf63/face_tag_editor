@@ -1,214 +1,79 @@
-
-
 <div class="titrePage">
   <h2>Face Tag Editor</h2>
 </div>
 
-    <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            padding: 20px;
-            background: #f9f9f9;
-        }
-        h1 {
-            text-align: center;
-            color: #667eea;
-            margin-bottom: 30px;
-        }
-        .columns {
-            display: flex;
-            gap: 40px;
-            max-width: 80%;
-            margin: 0 auto;
-        }
-        .col {
-            flex: 1;
-            background: white;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        h2 { 
-            margin-bottom: 20px;
-            color: #667eea;
-            font-size: 2.0em;
-        }
-        h3 {
-            margin-top: 25px;
-            margin-bottom: 12px;
-            color: #764ba2;
-            font-size: 1.2em;
-        }
-        p { 
-            margin-bottom: 12px;
-            line-height: 1.6;
-            text-align: justify;
-            font-size: 1.4em;
-        }
-        ul {
-            margin: 15px 0;
-            padding-left: 25px;
-            font-size: 1.4em;
-        }
-        li {
-            margin-bottom: 8px;
-            line-height: 1.6;
-        }
-        .code {
-            font-family: 'Courier New', monospace;
-            background: #f0f0f0;
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-size: 0.9em;
-        }
-        .highlight {
-            background: #fff3cd;
-            padding: 15px;
-            border-left: 4px solid #ffc107;
-            margin: 15px 0;
-            border-radius: 4px;
-        }
-        a {
-            color: #667eea;
-            text-decoration: none;
-        }
-        a:hover {
-            text-decoration: underline;
-        }
-        @media (max-width: 968px) {
-            .columns {
-                flex-direction: column;
-            }
-        }
-    </style>
+<style>
+  .fte-help { margin:0 0 2em 20px; max-width:700px; line-height:1.6; text-align:left; }
+  .fte-help h4 { margin:1.2em 0 0.3em 0; color:#333; border-bottom:1px solid #eee; padding-bottom:2px; }
+  .fte-help p { margin:0.3em 0 0.5em 0; }
+  .fte-help ul { margin:0.3em 0 0.5em 1.2em; padding:0; }
+  .fte-help li { margin:0.2em 0; }
+  .fte-help code { background:#f4f4f4; padding:1px 5px; border-radius:3px; font-size:0.9em; }
+</style>
 
+<div class="fte-help">
 
+  <h4>{'Présentation'|@translate}</h4>
+  <p>{'Le plugin face_tag_editor permet de créer et gérer des tags de visage sur les photos directement depuis Piwigo.'|@translate}</p>
 
+  <h4>{'Fonctionnalités'|@translate}</h4>
+  <p>{'Avec ce plugin vous pouvez :'|@translate}</p>
+  <ul>
+    <li>{'Créer ou supprimer des cadres de visage'|@translate}</li>
+    <li>{'Déplacer ou redimensionner un cadre de visage'|@translate}</li>
+    <li>{'Renommer une personne en double-cliquant sur son cadre'|@translate}</li>
+    <li>{'Rédiger une description enrichie de la photo'|@translate}</li>
+    <li>{'Télécharger la photo avec les cadres de visage incrustés'|@translate}</li>
+  </ul>
 
-<div class="columns">
-    <div class="col">
-        <h2>🇫🇷 Français</h2>
-        
-        <p>Le plugin <strong>face_tag_editor</strong> permet l'édition des tags de visage.</p>
-        
-        <h3>Fonctionnalités</h3>
-        <p>Avec ce plugin vous pouvez :</p>
-        <ul>
-            <li>créer/supprimer des cadres visages</li>
-            <li>déplacer, redimensionner un cadre de visage</li>
-            <li>pour renommer double cliquer sur le cadre</li>
-            <li>saisir/modifier la description de la photo</li>
-            <li>télécharger un photo avec les tags incrustés</li>
+  <h4>{'Droits d\'accès'|@translate}</h4>
+  <p>{'Pour utiliser le plugin, il faut être webmaster, administrateur, ou un utilisateur appartenant au groupe FaceTag. Les webmasters et administrateurs ont toujours un accès total.'|@translate}</p>
+  <p>{'Pour les membres du groupe FaceTag, l\'onglet "Gestion des droits" propose deux modes :'|@translate}</p>
+  <ul>
+    <li><strong>{'Tous les albums'|@translate}</strong> {': les utilisateurs du groupe peuvent taguer toutes les photos qu\'ils peuvent voir'|@translate}</li>
+    <li><strong>{'Sélectif par utilisateur'|@translate}</strong> {': les albums autorisés sont configurés individuellement pour chaque utilisateur (jusqu\'à 5 albums, sous-albums inclus)'|@translate}</li>
+  </ul>
 
-        </ul>
-        
-        <h3>Droits d'accès</h3>
-        <p>Pour pouvoir utiliser le plugin il faut être webmaster, administrateur ou un user appartenant au groupe FaceTag.</p>
-        <p>Les droits des utilisateurs sont soit globaux, soit sur des albums à spécifier.</p>
-        
-        <h3>Visualisation des résultats</h3>
-        <p>Pour visualiser les résultats il faut installer/activer le plugin face_tag : <a href="https://fr.piwigo.org/ext/index.php?eid=1051" target="_blank">https://fr.piwigo.org/ext/index.php?eid=1051</a></p>
-        <p>Ce plugin permet de visualiser instantanément le résultat de face_tag_editor.</p>
-        
-        <h3>Formats de métadonnées</h3>
-        <p>Les tags-visage sont enregistrés dans les métadonnées des photos aux formats :</p>
-        <ul>
-            <li><strong>MPReg</strong> (Microsoft Photo Region)</li>
-            <li><strong>MWG-RS</strong> (Metadata Working Group - Region Schema)</li>
-        </ul>
-        <p>Ces formats sont identiques à ceux utilisés par digiKam.</p>
-        
-        <div class="highlight">
-            <strong>✅ Compatibilité :</strong> Les tags visage existants créés à ces formats par d'autres logiciels sont pris en compte par face_tag_editor.
-        </div>
-        
-        <h3>Permissions requises</h3>
-        <p>Il faut que les fichiers jpg aient des droits en écriture.</p>
-        <p><strong>Pour les NAS Synology :</strong> il faut donner les droits lecture et écriture au groupe <span class="code">http</span> sur les répertoires concernés :</p>
-        <ul>
-            <li><span class="code">./data</span></li>
-            <li><span class="code">./upload</span></li>
-            <li><span class="code">./galleries</span></li>
-        </ul>
-        
-        <h3>Compatibilité des chemins</h3>
-        <p>L'édition des tags fonctionne sur les photos dans :</p>
-        <ul>
-            <li><span class="code">./upload</span></li>
-            <li><span class="code">./galleries</span> directement</li>
-            <li><span class="code">./galleries</span> + liens symboliques</li>
-        </ul>
-        
-        <h3>Sauvegarde et restauration</h3>
-        <p>La 1ère fois qu'un enregistrement d'une édition de tag visage est faite, une copie de la photo <span class="code">xyz.jpg</span> est réalisée sous le nom <span class="code">xyz.jpg.original</span> (que ce soit en <span class="code">./galleries</span> ou en <span class="code">./upload</span>).</p>
-        <p>Dans l'interface, un bouton <strong>"Restaurer"</strong> vous permet de revenir à la photo initiale.</p>
-        <p>Cette fonctionnalité peut être active ou inactive. La suppression sélective des .original est prévue.</p>
-        
-        <h3>Intégration Piwigo</h3>
-        <p>Les tags sont ajoutés à la liste des tags Piwigo, et les miniatures sont mises à jour.</p>
-    </div>
+  <h4>{'Description'|@translate}</h4>
+  <p>{'Un éditeur de texte enrichi (Trumbowyg) permet de rédiger ou modifier la description de la photo, dans la colonne de droite de la fenêtre de tag : mise en forme (gras, italique, souligné, couleurs, polices), listes, liens, mode plein écran.'|@translate}</p>
+  <p>{'La description est enregistrée en même temps que les tags de visage, via le même bouton "Enregistrer".'|@translate}</p>
+  <p>{'Si une description existante contient une mise en forme HTML complexe, elle s\'affiche en lecture seule pour éviter de l\'altérer involontairement.'|@translate}</p>
 
-    <div class="col">
-        <h2>🇬🇧 English</h2>
-        
-        <p>The <strong>face_tag_editor</strong> plugin allows you to edit face tags.</p>
-        
-        <h3>Features</h3>
-        <p>With this plugin, you can:</p>
-        <ul>
-            <li>create/delete face frames</li>
-            <li>move and resize a face frame</li>
-            <li>To rename, double-click on the frame</li>
-            <li>enter/edit the photo description</li>
-            <li>upload a photo with embedded tags</li>
-        </ul>
-        
-        <h3>Access Rights</h3>
-        <p>To use the plugin, you must be a webmaster, administrator, or a user belonging to the FaceTag group.</p>
-        <p>User rights are either global or specific to particular albums.</p>
-        
-        <h3>Viewing Results</h3>
-        <p>To view the results, you must install/activate the face_tag plugin: <a href="https://fr.piwigo.org/ext/index.php?eid=1051" target="_blank">https://fr.piwigo.org/ext/index.php?eid=1051</a></p>
-        <p>This plugin allows you to instantly view the results of face_tag_editor.</p>
-        
-        <h3>Metadata Formats</h3>
-        <p>Face tags are saved in the photo metadata in the following formats:</p>
-        <ul>
-            <li><strong>MPReg</strong> (Microsoft Photo Region)</li>
-            <li><strong>MWG-RS</strong> (Metadata Working Group - Region Schema)</li>
-        </ul>
-        <p>These formats are identical to those used by digiKam.</p>
-        
-        <div class="highlight">
-            <strong>✅ Compatibility:</strong> Existing face tags created in these formats by other software are recognized by face_tag_editor.
-        </div>
-        
-        <h3>Required Permissions</h3>
-        <p>JPG files must have write permissions.</p>
-        <p><strong>For Synology NAS devices:</strong> you must grant read and write permissions to the <span class="code">http</span> group on the relevant directories:</p>
-        <ul>
-            <li><span class="code">./data</span></li>
-            <li><span class="code">./upload</span></li>
-            <li><span class="code">./galleries</span></li>
-        </ul>
-        
-        <h3>Path Compatibility</h3>
-        <p>Tag editing works on photos in:</p>
-        <ul>
-            <li><span class="code">./upload</span></li>
-            <li>directly in <span class="code">./galleries</span></li>
-            <li><span class="code">./galleries</span> with symbolic links</li>
-        </ul>
-        
-        <h3>Backup and Restore</h3>
-        <p>The first time a face tag edit is saved, a copy of the photo <span class="code">xyz.jpg</span> is created under the name <span class="code">xyz.jpg.original</span> (whether in <span class="code">./galleries</span> or <span class="code">./upload</span>).</p>
-        <p>A <strong>"Restore"</strong> button in the interface allows you to revert to the original photo.</p>
-        <p>This feature can be enabled or disabled. Selective deletion of .original files is planned.</p>
-        
-        <h3>Piwigo Integration</h3>
-        <p>The tags are added to the Piwigo tag list, and the thumbnails are updated.</p>
-    </div>
+  <h4>{'Visualisation des résultats'|@translate}</h4>
+  <p>{'Pour visualiser les résultats, il faut installer et activer le plugin'|@translate} <strong>face_tag</strong> : <a href="https://fr.piwigo.org/ext/index.php?eid=1051" target="_blank">https://fr.piwigo.org/ext/index.php?eid=1051</a></p>
+  <p>{'Ce plugin permet de visualiser instantanément le résultat de face_tag_editor.'|@translate}</p>
+
+  <h4>{'Formats de métadonnées'|@translate}</h4>
+  <p>{'Les tags de visage sont enregistrés dans les métadonnées des photos aux formats :'|@translate}</p>
+  <ul>
+    <li><strong>MPReg</strong> {'(Microsoft Photo Region)'|@translate}</li>
+    <li><strong>MWG-RS</strong> {'(Metadata Working Group - Region Schema)'|@translate}</li>
+  </ul>
+  <p>{'Ces formats sont identiques à ceux utilisés par digiKam. Les tags de visage existants créés à ces formats par d\'autres logiciels sont pris en compte par face_tag_editor.'|@translate}</p>
+
+  <h4>{'Permissions requises'|@translate}</h4>
+  <p>{'Les fichiers jpg doivent avoir des droits en écriture.'|@translate}</p>
+  <p>{'Pour les NAS Synology, il faut donner les droits lecture et écriture au groupe'|@translate} <code>http</code> {'sur les répertoires concernés :'|@translate}</p>
+  <ul>
+    <li><code>./data</code></li>
+    <li><code>./upload</code></li>
+    <li><code>./galleries</code></li>
+  </ul>
+
+  <h4>{'Compatibilité des chemins'|@translate}</h4>
+  <p>{'L\'édition des tags fonctionne sur les photos situées dans :'|@translate}</p>
+  <ul>
+    <li><code>./upload</code></li>
+    <li><code>./galleries</code> {'directement'|@translate}</li>
+    <li><code>./galleries</code> {'via des liens symboliques'|@translate}</li>
+  </ul>
+
+  <h4>{'Sauvegarde et restauration'|@translate}</h4>
+  <p>{'La première fois qu\'un enregistrement de tag visage est effectué, une copie de la photo'|@translate} <code>xyz.jpg</code> {'est réalisée sous le nom'|@translate} <code>xyz.jpg.original</code> {'(que ce soit dans'|@translate} <code>./galleries</code> {'ou'|@translate} <code>./upload</code>).</p>
+  <p>{'Dans l\'interface, un bouton "Restaurer" permet de revenir à la photo initiale.'|@translate}</p>
+  <p>{'Cette fonctionnalité peut être activée ou désactivée. La suppression sélective des fichiers .original est possible depuis l\'onglet "Gestion des .original".'|@translate}</p>
+
+  <h4>{'Intégration Piwigo'|@translate}</h4>
+  <p>{'Les tags sont ajoutés à la liste des tags Piwigo, et les miniatures sont mises à jour.'|@translate}</p>
+
 </div>
-
-</body>
-</html>

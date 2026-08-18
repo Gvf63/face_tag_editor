@@ -81,14 +81,14 @@ class FaceTagMetadataReader
     $xpath->registerNamespace('digiKam', 'http://www.digikam.org/ns/1.0/');
     
     // dc:subject
-    $subjects = $xpath->query('//dc:subject/rdf:Bag/rdf:li');
+    $subjects = $xpath->query('//dc:subject/rdf:Bag/rdf:li | //dc:subject/rdf:Seq/rdf:li');
     //*error_log('parseXmp - dc:subject trouves: ' . $subjects->length);
     foreach ($subjects as $subject) {
       $data['subjects'][] = $subject->nodeValue;
     }
     
     // lr:hierarchicalSubject
-    $hier = $xpath->query('//lr:hierarchicalSubject/rdf:Bag/rdf:li');
+    $hier = $xpath->query('//lr:hierarchicalSubject/rdf:Bag/rdf:li | //lr:hierarchicalSubject/rdf:Seq/rdf:li');
     //*error_log('parseXmp - hierarchicalSubject trouves: ' . $hier->length);
     foreach ($hier as $h) {
       $data['hierarchical_subjects'][] = $h->nodeValue;
