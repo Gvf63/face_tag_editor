@@ -8,7 +8,7 @@
     
     // Dans la console du navigateur
    // console.log($('link[href*="font-awesome"]').attr('href'));
-    console.log('Face Tag Editor: Script chargé )');
+    console.log('Face Tag Editor: Script chargé');
     
     var canvas = null;
     var currentRect = null;
@@ -208,7 +208,7 @@ async function loadFacetagTranslations() {
 $(document).on('click', '#facetag-open-editor', async function(e) {
   e.preventDefault();
   
-  //*console.log('=== CLIC SUR TAGUER ===');
+  // *console.log('=== CLIC SUR TAGUER ===');
   
   // Désactiver le bouton pendant le chargement
   var $btn = $(this);
@@ -223,11 +223,11 @@ $(document).on('click', '#facetag-open-editor', async function(e) {
   currentDescription = $btn.data('description') || '';
   isDescriptionReadonly = $btn.data('description-is-readonly') === 'true' || $btn.data('description-is-readonly') === true;
 
-  //*console.log('Image ID:', imageId, '- Has a backup original:', hasOriginal);
-  //*console.log('Image ID:', imageId);
-  //*console.log('Image URL:', imageSrc);
-  //*console.log('Nom du fichier:', imageSrc.split('/').pop());
-  //*console.log('Save URL:', saveUrl);
+  // *console.log('Image ID:', imageId, '- Has a backup original:', hasOriginal);
+  // *console.log('Image ID:', imageId);
+  // *console.log('Image URL:', imageSrc);
+  // *console.log('Nom du fichier:', imageSrc.split('/').pop());
+  // *console.log('Save URL:', saveUrl);
 
   try {
     // Charger les traductions d'abord
@@ -406,12 +406,12 @@ if (isDescriptionReadonly) {
 
       //-------------------------------------------------------------------------------------------------
       // Afficher le bouton "Restaurer" seulement si un fichier .original existe
-      //*console.log('Vérification hasOriginal:', hasOriginal);
+      // *console.log('Vérification hasOriginal:', hasOriginal);
       if (hasOriginal === true || hasOriginal === 'true') {
-        //*console.log('Affichage du bouton restaurer');
+        // *console.log('Affichage du bouton restaurer');
         $('#facetag-restore-original').show();
       } else {
-        //*console.log('Masquage du bouton restaurer');
+        // *console.log('Masquage du bouton restaurer');
         $('#facetag-restore-original').hide();
       }
       
@@ -425,13 +425,13 @@ if (isDescriptionReadonly) {
       //-----------------------------------------------------------------------------------------
       // Événement d'enregistrement
       $('#facetag-save-xmp').click(function() {
-        //*console.log("=== CLIC SUR ENREGISTRER ===");
-        //*console.log("Image ID:", imageId);
-        //*console.log("Nombre de visages:", faces.length);
+        // *console.log("=== CLIC SUR ENREGISTRER ===");
+        // *console.log("Image ID:", imageId);
+        // *console.log("Nombre de visages:", faces.length);
         
         // Permettre l'enregistrement même avec 0 visages (pour supprimer tous les tags)  V1.9A
         if (faces.length === 0 && existingFaces.length > 0) {
-          //*console.log("⚠️ Aucun visage - demande de confirmation");
+          // *console.log("⚠️ Aucun visage - demande de confirmation");
           if (!confirm(_('Voulez-vous vraiment supprimer tous les tags de visages de cette image ?'))) {
             console.log("❌ Annulation par l'utilisateur");
             return;
@@ -449,11 +449,13 @@ if (isDescriptionReadonly) {
           };
         });
         
-        //*console.log('📦 Données à enregistrer:', facesData);
+        // *console.log('📦 Données à enregistrer:', facesData);
         //console.log('📄 JSON:', JSON.stringify(facesData));
-        //*console.log('🌐 URL:', saveUrl);
+        // *console.log('🌐 URL:', saveUrl);
         
-        $(this).prop('disabled', true).text('Enregistrement...');
+        //$(this).prop('disabled', true).text('Enregistrement...');
+        $(this).prop('disabled', true).text(_('Enregistrement...'));
+
         //console.log("🔒 Bouton désactivé");
         
         // Créer un FormData pour envoyer en POST
@@ -484,7 +486,7 @@ $.ajax({
           contentType: false,
           dataType: 'json',
           success: function(data) {
-            //*console.log('Réponse:', data);
+            // *console.log('Réponse:', data);
   
   var result = data.result || data;
   
@@ -499,7 +501,7 @@ if (data.stat === 'ok' || result.stat === 'ok') {
   }
     
 
-    //*alert(msg);
+    // *alert(msg);
 
 
     closeModal();
@@ -509,7 +511,7 @@ if (data.stat === 'ok' || result.stat === 'ok') {
     
 
   } else {
-    //*console.log('Erreur: ' + (data.message || result.message || 'Erreur inconnue'));
+    // *console.log('Erreur: ' + (data.message || result.message || 'Erreur inconnue'));
   }
 },
 
@@ -552,11 +554,11 @@ error: function(xhr, status, error) {
               errorMsg = xhr.responseText || error;
             }
             
-            //*alert('❌ Erreur : ' + errorMsg);
+            // *alert('❌ Erreur : ' + errorMsg);
 
           },
           complete: function() {
-            $('#facetag-save-xmp').prop('disabled', false).text('💾 Enregistrer ');
+            $('#facetag-save-xmp').prop('disabled', false).text('💾 ' + _('Enregistrer '));
           }
         });
       });
@@ -584,11 +586,14 @@ error: function(xhr, status, error) {
 //-----------------------------------------------------------------------------------------------------      
 // Événement restaurer l'original
       $('#facetag-restore-original').click(function() {
-       if (!confirm(_('⚠️ ATTENTION ⚠️\n\nCette action va :\n• Restaurer le fichier .original \n• Régénérer les miniatures\n\nÊtes-vous sûr de vouloir continuer ?'))) {
-      return; 
-      }
+if (!confirm(_('confirm_restore_original'))) {
+    return;
+}       
+//if (!confirm('⚠️ ' + ${_('ATTENTION\n\nCette action va :\n• Restaurer le fichier .original \n• Régénérer les miniatures\n\nÊtes-vous sûr de vouloir// continuer ?')})) {
+//      return; 
+//      }
         
-        //*console.log('=== RESTAURATION DE L\'ORIGINAL ===');
+        // *console.log('=== RESTAURATION DE L\'ORIGINAL ===');
         
         $(this).prop('disabled', true).text('Restauration...');
         
@@ -604,13 +609,13 @@ error: function(xhr, status, error) {
           contentType: false,
           dataType: 'json',
           success: function(data) {
-            //*console.log('Réponse serveur:', data);
+            // *console.log('Réponse serveur:', data);
 
             // Vérifier la structure de réponse Piwigo
             var result = data.result || data;
 
             if (data.stat === 'ok' || result.stat === 'ok') {
-              //*alert(_('✅ Fichier original restauré avec succès !'));
+              // *alert(_('✅ Fichier original restauré avec succès !'));
               closeModal();
               // Recharger la page pour mettre à jour l'état du bouton restaurer
               setTimeout(function() {
@@ -631,7 +636,7 @@ error: function(xhr, status, error) {
             try {
               var response = JSON.parse(xhr.responseText);
               if (response.stat === 'ok') {
-                //*alert(_('✅ Fichier original restauré avec succès !'));
+                // *alert(_('✅ Fichier original restauré avec succès !'));
                 closeModal();
                 setTimeout(function() {
                   location.reload();
@@ -656,7 +661,7 @@ error: function(xhr, status, error) {
             } else if (xhr.status === 403) {
               alert(_('❌ Accès refusé. Vous n\'avez pas les permissions nécessaires.'));
             } else {
-              //*console.log('❌ Erreur : ' + errorMsg);
+              // *console.log('❌ Erreur : ' + errorMsg);
             }
           },
           complete: function() {
@@ -676,32 +681,32 @@ error: function(xhr, status, error) {
     
     // ==================== CHARGER LES XMP (comme face_tag) ===========================================================
     function loadXmpData(callback) {
-      //*console.log('Chargement des XMP...');
+      // *console.log('Chargement des XMP...');
       
       // Ajouter un timestamp pour éviter TOUT cache (navigateur + serveur)
       var nocache = '&_nocache=' + Date.now() + '&_rand=' + Math.random();
       var ajaxUrl = saveUrl.replace('facetagwrite.saveXMP', 'facetagwrite.getXMP') + '&image_id=' + imageId + nocache;
-      //*console.log('URL:', ajaxUrl);
+      // *console.log('URL:', ajaxUrl);
       
       $.ajax({
         url: ajaxUrl,
         type: 'GET',
         dataType: 'json',
         success: function(data) {
-          //*console.log('=== RÉPONSE AJAX ===');
-          //*console.log('data:', data);
+          // *console.log('=== RÉPONSE AJAX ===');
+          // *console.log('data:', data);
           
           // Piwigo enveloppe dans data.result, et notre WS renvoie aussi result
           // Donc les XMP sont dans data.result.result.xmp !
           var xmpContainer = data.result && data.result.result ? data.result.result : data.result;
           
-          //*console.log('xmpContainer:', xmpContainer);
+          // *console.log('xmpContainer:', xmpContainer);
           
           if (xmpContainer && xmpContainer.xmp) {
-            //*console.log('✓ XMP trouvé');
-            //*console.log('_raw_xmp présent:', '_raw_xmp' in xmpContainer.xmp);
+            // *console.log('✓ XMP trouvé');
+            // *console.log('_raw_xmp présent:', '_raw_xmp' in xmpContainer.xmp);
             if (xmpContainer.xmp._raw_xmp) {
-              //*console.log('_raw_xmp longueur:', xmpContainer.xmp._raw_xmp.length);
+              // *console.log('_raw_xmp longueur:', xmpContainer.xmp._raw_xmp.length);
             }
           }
           
@@ -710,28 +715,28 @@ if (data.stat === 'ok' && xmpContainer && xmpContainer.xmp) {
             
             // ====================  STOCKER L'ORIENTATION =======================================================
             xmpData.orientation = xmpContainer.orientation || 1;
-            //*console.log('✓ Orientation EXIF:', xmpData.orientation);
+            // *console.log('✓ Orientation EXIF:', xmpData.orientation);
             
-            //*console.log('✓ XMP Orientation chargé');
+            // *console.log('✓ XMP Orientation chargé');
             
             // === UTILISER LES FACES PARSÉES CÔTÉ SERVEUR ===
             if (xmpData.faces && xmpData.faces.length > 0) {
               existingFaces = xmpData.faces;
-              //*console.log('✓ Faces reçues du serveur:', existingFaces.length);
+              // *console.log('✓ Faces reçues du serveur:', existingFaces.length);
               existingFaces.forEach(function(face, i) {
-                //*console.log('  Face ' + (i+1) + ':', face.name, '- x:', face.x.toFixed(3), 'y:', face.y.toFixed(3));
+                // *console.log('  Face ' + (i+1) + ':', face.name, '- x:', face.x.toFixed(3), 'y:', face.y.toFixed(3));
               });
             } else {
               // Fallback: Parser le XMP en JavaScript si pas de faces côté serveur
-              //*console.log('⚠ Pas de faces du serveur, parsing JavaScript...');
+              // *console.log('⚠ Pas de faces du serveur, parsing JavaScript...');
               existingFaces = parseFacesFromXMP(xmpData);
-              //*console.log('✓ Visages parsés (JS):', existingFaces.length);
+              // *console.log('✓ Visages parsés (JS):', existingFaces.length);
             }
             
             callback(existingFaces);
 
           } else {
-            //*console.log('❌ Pas de XMP disponible');
+            // *console.log('❌ Pas de XMP disponible');
             callback([]);
           }
         },
@@ -767,13 +772,13 @@ if (data.stat === 'ok' && xmpContainer && xmpContainer.xmp) {
     
     // ==================== CHARGER L'IMAGE ET INITIALISER ====================
     function loadImageAndInitCanvas() {
-      //*console.log('Chargement de l\'image:', imageSrc);
+      // *console.log('Chargement de l\'image:', imageSrc);
       
       // Créer un élément image temporaire pour obtenir les dimensions
       var img = new Image();
       
       img.onload = function() {
-        //*console.log('Image chargée - Dimensions naturelles:', img.naturalWidth, 'x', img.naturalHeight);
+        // *console.log('Image chargée - Dimensions naturelles:', img.naturalWidth, 'x', img.naturalHeight);
         
         // Calculer les dimensions du canvas pour qu'il tienne dans la zone disponible
         var maxWidth = window.innerWidth - 500; // -500 pour la sidebar (420px + paddings/bordure)
@@ -788,7 +793,7 @@ if (data.stat === 'ok' && xmpContainer && xmpContainer.xmp) {
         var canvasWidth = img.naturalWidth * scale;
         var canvasHeight = img.naturalHeight * scale;
         
-        //*console.log('Dimensions canvas:', canvasWidth, 'x', canvasHeight, '(scale:', scale, ')');
+        // *console.log('Dimensions canvas:', canvasWidth, 'x', canvasHeight, '(scale:', scale, ')');
         
         // Initialiser Fabric.js
         canvas = new fabric.Canvas('facetag-canvas', {
@@ -809,7 +814,7 @@ if (data.stat === 'ok' && xmpContainer && xmpContainer.xmp) {
           fabricImg.scaleToWidth(canvasWidth);
           canvas.setBackgroundImage(fabricImg, canvas.renderAll.bind(canvas));
           
-          //*console.log('Background image défini');
+          // *console.log('Background image défini');
           
           // Charger les visages existants (méthode simplifiée)
           loadXmpData(function(existingFacesData) {
@@ -820,7 +825,7 @@ if (data.stat === 'ok' && xmpContainer && xmpContainer.xmp) {
             
             updateFacesList();
             setupDrawingMode();
-            //*console.log('Canvas prêt, mode dessin activé');
+            // *console.log('Canvas prêt, mode dessin activé');
 
 
 
@@ -846,15 +851,15 @@ if (data.stat === 'ok' && xmpContainer && xmpContainer.xmp) {
     function parseFacesFromXMP(data) {
       var faces = [];
       
-      //*console.log('=== PARSING XMP ===');
+      // *console.log('=== PARSING XMP ===');
       
       // Si on a le XMP brut, on le parse
       if (!data._raw_xmp) {
-        //*console.log('❌ Pas de _raw_xmp');
+        // *console.log('❌ Pas de _raw_xmp');
         return faces;
       }
       
-      //*console.log('✓ _raw_xmp trouvé, longueur:', data._raw_xmp.length);
+      // *console.log('✓ _raw_xmp trouvé, longueur:', data._raw_xmp.length);
       
       var xmlString = data._raw_xmp;
       
@@ -874,7 +879,7 @@ if (data.stat === 'ok' && xmpContainer && xmpContainer.xmp) {
       
       if (mpriRegions.length > 0) {
         var rdfLis = mpriRegions[0].getElementsByTagName('rdf:li');
-        //*console.log('MPReg trouvé:', rdfLis.length, 'visages');
+        // *console.log('MPReg trouvé:', rdfLis.length, 'visages');
         
         for (var i = 0; i < rdfLis.length; i++) {
           var li = rdfLis[i];
@@ -917,7 +922,7 @@ if (data.stat === 'ok' && xmpContainer && xmpContainer.xmp) {
                 h: coords[3],
                 format: 'mpreg'
               });
-              //*console.log('✓ Visage ajouté (MPReg):', name);
+              // *console.log('✓ Visage ajouté (MPReg):', name);
             }
           }
         }
@@ -929,7 +934,7 @@ var mwgRegionList = xmlDoc.getElementsByTagName('mwg-rs:RegionList');
 
 if (mwgRegionList.length > 0) {
   var descriptions = mwgRegionList[0].getElementsByTagName('rdf:li');
-  //*console.log('mwg-rs trouvé:', descriptions.length, 'visages');
+  // *console.log('mwg-rs trouvé:', descriptions.length, 'visages');
   
   for (var i = 0; i < descriptions.length; i++) {
     var desc = descriptions[i];
@@ -988,7 +993,7 @@ if (mwgRegionList.length > 0) {
               h: parseFloat(h),
               format: 'mwg-rs'
             });
-            //*console.log('✓ Visage ajouté (mwg-rs):', name);
+            // *console.log('✓ Visage ajouté (mwg-rs):', name);
           }
         }
       }
@@ -996,7 +1001,7 @@ if (mwgRegionList.length > 0) {
   }
 }
       
-      //*console.log('=== Total visages parsés:', faces.length, '===');
+      // *console.log('=== Total visages parsés:', faces.length, '===');
       return faces;
     }
     
@@ -1014,7 +1019,7 @@ if (mwgRegionList.length > 0) {
       
       // ==================== APPLIQUER LA TRANSFORMATION EXIF ====================
       var orientation = xmpData.orientation || 1;
-      //*console.log('Orientation pour affichage:', orientation);
+      // *console.log('Orientation pour affichage:', orientation);
       
       var transformed = transformCoordinates(left, top, width, height, orientation);
       left = transformed.left;
@@ -1022,7 +1027,7 @@ if (mwgRegionList.length > 0) {
       width = transformed.width;
       height = transformed.height;
       
-      //*console.log('Affichage visage existant:', face.name, 'à', left.toFixed(2) + '%', top.toFixed(2) + '%', width.toFixed(2) + '%', height.toFixed(2) + '%');
+      // *console.log('Affichage visage existant:', face.name, 'à', left.toFixed(2) + '%', top.toFixed(2) + '%', width.toFixed(2) + '%', height.toFixed(2) + '%');
       
       // Convertir % en pixels pour le canvas
       var leftPx = (left / 100) * canvas.displayWidth;
@@ -1072,13 +1077,13 @@ if (mwgRegionList.length > 0) {
       
       // Activer les contrôles sur les objets sélectionnés
       canvas.on('selection:created', function(e) {
-        //*console.log('Objet sélectionné');
+        // *console.log('Objet sélectionné');
       });
       
       canvas.on('mouse:down', function(options) {
         // Si on clique sur un objet existant, ne rien faire (mode édition activé automatiquement)
         if (options.target) {
-          //*console.log('Clic sur un rectangle existant - mode édition');
+          // *console.log('Clic sur un rectangle existant - mode édition');
           return;
         }
         
@@ -1199,7 +1204,7 @@ canvas.on('object:modified', function(e) {
     faces[faceIndex].w = w;
     faces[faceIndex].h = h;
 
-    //*console.log('Rectangle modifié, nouvelles coordonnées:', faces[faceIndex]);
+    // *console.log('Rectangle modifié, nouvelles coordonnées:', faces[faceIndex]);
   }
 });
 
@@ -1213,7 +1218,7 @@ canvas.on('object:modified', function(e) {
 
         // Vérifier si c'est un double-clic (< 300ms) sur le même objet
         if (options.target && timeDiff < 300 && lastClickedObject === options.target) {
-          //*console.log('=== DOUBLE-CLIC DÉTECTÉ ===');
+          // *console.log('=== DOUBLE-CLIC DÉTECTÉ ===');
           var faceIndex = faces.findIndex(f => f.rect === options.target);
           if (faceIndex !== -1) {
             promptForRename(faceIndex);
@@ -1249,22 +1254,22 @@ canvas.on('object:modified', function(e) {
       $('#facetag-name-input').focus();
       
      $('#facetag-name-save').click(function() {
-        //*console.log("=== CLIC SUR VALIDER (nom du visage) ===");
+        // *console.log("=== CLIC SUR VALIDER (nom du visage) ===");
         var name = $('#facetag-name-input').val().trim();
-        //*console.log("Nom saisi:", name);
+        // *console.log("Nom saisi:", name);
         
         if (!name) {
-          //*console.log("⚠️ Nom vide - alerte affichée");
+          // *console.log("⚠️ Nom vide - alerte affichée");
           alert(_('Veuillez entrer un nom'));
           return;
         }
         
-//*console.log("✅ Nom valide, ajout du label et sauvegarde...");
+// *console.log("✅ Nom valide, ajout du label et sauvegarde...");
 
 try {
   addLabelToRect(rect, name);
   saveFaceData(rect, name);
-  //*console.log("✅ Visage créé avec succès");
+  // *console.log("✅ Visage créé avec succès");
 } catch (error) {
   console.error("❌ ERREUR lors de la sauvegarde du visage:", error);
   console.error("⚠️ Erreur technique : " + error.message + "\n\nLe rectangle a été créé mais les coordonnées n'ont peut-être pas été sauvegardées correctement.");
@@ -1274,7 +1279,7 @@ closeNameModal();
       });
       
       $('#facetag-name-cancel').click(function() {
-        //*console.log("=== CLIC SUR ANNULER ===");
+        // *console.log("=== CLIC SUR ANNULER ===");
         canvas.remove(rect);
         closeNameModal();
       });
@@ -1312,18 +1317,18 @@ var renameModal = `
       $('#facetag-rename-input').focus().select();
 
       $('#facetag-rename-save').click(function() {
-        //*console.log("=== CLIC SUR RENOMMER ===");
+        // *console.log("=== CLIC SUR RENOMMER ===");
         var newName = $('#facetag-rename-input').val().trim();
-        //*console.log("Ancien nom:", face.name, "Nouveau nom:", newName);
+        // *console.log("Ancien nom:", face.name, "Nouveau nom:", newName);
 
         if (!newName) {
-          //*console.log("⚠️ Nom vide - alerte affichée");
+          // *console.log("⚠️ Nom vide - alerte affichée");
           alert(_('Veuillez entrer un nom'));
           return;
         }
 
         if (newName === face.name) {
-          //*console.log("ℹ️ Nom identique, pas de changement");
+          // *console.log("ℹ️ Nom identique, pas de changement");
           closeRenameModal();
           return;
         }
@@ -1340,12 +1345,12 @@ var renameModal = `
         // Mettre à jour la liste des visages
         updateFacesList();
 
-        //*console.log("✅ Visage renommé avec succès");
+        // *console.log("✅ Visage renommé avec succès");
         closeRenameModal();
       });
 
       $('#facetag-rename-cancel').click(function() {
-        //*console.log("=== CLIC SUR ANNULER (renommage) ===");
+        // *console.log("=== CLIC SUR ANNULER (renommage) ===");
         closeRenameModal();
       });
 
@@ -1408,7 +1413,7 @@ function addLabelToRect(rect, name) {
     w = original.width / 100;
     h = original.height / 100;
     
-    //*console.log('Transformation inverse appliquée (orientation=' + orientation + ')');
+    // *console.log('Transformation inverse appliquée (orientation=' + orientation + ')');
   }
   
   var face = {
@@ -1434,7 +1439,8 @@ function updateFacesList() {
   $list.empty();
   
   if (faces.length === 0) {
-    $list.html('<p>Aucun visage tagué</p>');
+    $list.html(`<p>${_('Aucun visage tagué')}</p>`);
+    // $list.html('<p>Aucun visage tagué</p>');
     return;
   }
   
@@ -1494,9 +1500,9 @@ function downloadImageWithTags() {
     // Calculer le ratio entre résolution originale et canvas affiché
     var scaleRatio = canvas.imageWidth / canvas.displayWidth;
     
-    //*console.log('Résolution originale:', canvas.imageWidth, 'x', canvas.imageHeight);
-    //*console.log('Résolution affichée:', canvas.displayWidth, 'x', canvas.displayHeight);
-    //*console.log('Scale ratio:', scaleRatio);
+    // *console.log('Résolution originale:', canvas.imageWidth, 'x', canvas.imageHeight);
+    // *console.log('Résolution affichée:', canvas.displayWidth, 'x', canvas.displayHeight);
+    // *console.log('Scale ratio:', scaleRatio);
     
     // Charger l'image originale en haute résolution
     var img = new Image();
@@ -1559,7 +1565,7 @@ function downloadImageWithTags() {
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
             
-            //*console.log('✅ Image téléchargée en résolution', canvas.imageWidth, 'x', canvas.imageHeight);
+            // *console.log('✅ Image téléchargée en résolution', canvas.imageWidth, 'x', canvas.imageHeight);
         }, 'image/jpeg', 0.95);
     };
     
