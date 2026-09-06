@@ -15,6 +15,7 @@ $lang['Description'] = 'Description';
 $lang['Lecture seule : mise en forme HTML complexe détectée, non modifiable ici.'] = 'Read-only: complex HTML formatting detected, not editable here.';
 $lang['Annuler'] = 'Cancel';
 $lang['Enregistrer '] = 'Save';
+$lang['Enregistrement...'] = 'Saving...';
 
 // éditeur liste visages
 $lang['existant'] = 'existing';
