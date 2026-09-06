@@ -177,6 +177,7 @@ require_once(FACETAGWRITE_PATH . 'img/icon_svg.php'); // image du bouton taguer
 load_language('plugin.lang', FACETAGWRITE_PATH, array('language' => 'en_UK', 'no_fallback' => true));
 // Puis charger la langue de l'utilisateur (qui écrasera l'anglais si c'est du français)
 load_language('plugin.lang', FACETAGWRITE_PATH);
+
 //=================================================================================
 
 
@@ -228,7 +229,7 @@ function face_tag_write_load_scripts()
   // Définir les valeurs par défaut
   $save_original = isset($config['save_original']) ? $config['save_original'] : true;
   
-  // Choisir la langue Trumbowyg (fr/de/ru disponibles localement, en par défaut sinon)
+  // Choisir la langue Trumbowyg (fr/de/ru/it disponibles localement, en par défaut sinon)
   $piwigo_lang = isset($user['language']) ? $user['language'] : 'en_UK';
   $trumbowyg_lang = 'en';
   $trumbowyg_lang_script = '';
@@ -238,6 +239,8 @@ function face_tag_write_load_scripts()
     $trumbowyg_lang = 'de';
   } elseif (strpos($piwigo_lang, 'ru') === 0) {
     $trumbowyg_lang = 'ru';
+  } elseif (strpos($piwigo_lang, 'it') === 0) {
+    $trumbowyg_lang = 'it';
   }
   if ($trumbowyg_lang !== 'en') {
     $trumbowyg_lang_script = '<script src="' . FACETAGWRITE_PATH . 'js/vendor/trumbowyg/langs/' . $trumbowyg_lang . '.min.js"></script>';
@@ -1282,7 +1285,17 @@ function facetag_add_ws_methods($arr)
 
 function facetag_ws_get_translations($params, &$service)
 {
-  
+  global $user;
+  $language = isset($user['language']) ? $user['language'] : 'en_UK';
+  load_language(
+    'plugin.lang',
+    FACETAGWRITE_PATH,
+    array(
+      'language' => $language,
+      'no_fallback' => true
+    )
+  );
+
   // Créer le tableau JavaScript
   $translations = array(
     'Éditeur de visages' => l10n('Éditeur de visages'),
@@ -1298,7 +1311,8 @@ function facetag_ws_get_translations($params, &$service)
     'Description' => l10n('Description'),
     'Lecture seule : mise en forme HTML complexe détectée, non modifiable ici.' => l10n('Lecture seule : mise en forme HTML complexe détectée, non modifiable ici.'),
     'Annuler' => l10n('Annuler'),
-    'Enregistrer' => l10n('Enregistrer'),
+    'Enregistrer ' => l10n('Enregistrer '),  //fix by gvf
+    'Enregistrement...' => l10n('Enregistrement...'),   // add by gvf
     'existant' => l10n('existant'),
     'Supprimer' => l10n('Supprimer'),
     'Nommer la personne' => l10n('Nommer la personne'),
@@ -1323,7 +1337,8 @@ function facetag_ws_get_translations($params, &$service)
     'Backup: Déjà existant' => l10n('Backup: Déjà existant'),
     'Voulez-vous vraiment supprimer tous les tags de visages de cette image ?' => l10n('Voulez-vous vraiment supprimer tous les tags de visages de cette image ?'),
     'Êtes-vous sûr de vouloir effacer tous les rectangles ?' => l10n('Êtes-vous sûr de vouloir effacer tous les rectangles ?'),
-    '⚠️ ATTENTION ⚠️\n\nCette action va :\n• Restaurer le fichier .original \n• Régénérer les miniatures\n\nÊtes-vous sûr de vouloir continuer ?' => l10n('⚠️ ATTENTION ⚠️\n\nCette action va :\n• Restaurer le fichier .original \n• Régénérer les miniatures\n\nÊtes-vous sûr de vouloir continuer ?'),
+    'confirm_restore_original' => l10n('confirm_restore_original'),
+    'ATTENTION\n\nCette action va :\n• Restaurer le fichier .original \n• Régénérer les miniatures\n\nÊtes-vous sûr de vouloir continuer ?' => l10n('ATTENTION\n\nCette action va :\n• Restaurer le fichier .original \n• Régénérer les miniatures\n\nÊtes-vous sûr de vouloir continuer ?'),
     'Télécharger JPG' => l10n('Télécharger JPG'),
     'Télécharger l\'image avec les rectangles visibles' => l10n('Télécharger l\'image avec les rectangles visibles'),
     'Aucun visage tagué à télécharger' => l10n('Aucun visage tagué à télécharger'),
